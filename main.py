@@ -11,20 +11,78 @@ user_screen = 1920, 1080
 size = width, height = user_screen[0], user_screen[1]
 screen = pygame.display.set_mode(size)
 
-# 0 - nothing
-# 1 - wall
-# 2 - skeleton
-current_level = 1
-level1 = [[0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-          [0, 0, 0, 2, 0, 1, 0, 0, 2, 0],
-          [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-          [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
-          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          [0, 0, 0, 0, 1, 0, 0, 0, 1, 1],
-          [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-          [0, 0, 0, 0, 1, 0, 0, 2, 0, 0],
-          [0, 0, 0, 0, 1, 0, 0, 0, 0, 0]]
+
+def terminate():
+    pygame.quit()
+    sys.exit()
+
+
+def load_level(filename):
+    if os.path.exists(filename):
+        with open(filename, 'r') as level_map:
+            return level_map.read()
+
+
+def generate_level(level_map):
+    level_map = level_map.split()
+    global current_level
+    current_level = level_map
+    for y in range(len(level_map)):
+        for x in range(len(level_map[y])):
+            if level_map[y][x] == '-':
+                Ground((y, x), all_sprites)
+            elif level_map[y][x] == 'W':
+                Wall((y, x), all_sprites)
+            elif level_map[y][x] == 'S':
+                Ground((y, x), all_sprites)
+                Skeleton((y, x), all_sprites)
+            elif level_map[y][x] == 'P':
+                Ground((y, x), all_sprites)
+                global hero, hero_sprite
+                hero_sprite = pygame.sprite.Sprite()
+                hero_sprite.image = load_image("hero wo bg.png")
+                hero_sprite.image = pygame.transform.scale(hero_sprite.image, (98, 95))
+                hero_sprite.rect = hero_sprite.image.get_rect()
+                hero_sprite.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * x
+                hero_sprite.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (10 - y)
+                hero = Hero([x, 9 - y])
+    all_sprites.add(hero_sprite)
+
+
+def main_menu():
+    title_text = "НАЗВАНИЕ"
+    level_texts = ["1 УРОВЕНЬ", "2 УРОВЕНЬ", "3 УРОВЕНЬ"]
+    level1_btn_pos = (140, 380)
+    level1_btn_size = (300, 100)
+
+    fon = pygame.transform.scale(load_image('bg 4 menu.jpg'), user_screen)
+    screen.blit(fon, (0, 0))
+    font = pygame.font.Font(None, 60)
+
+    # кнопка 1 уровня
+    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level1_btn_pos, level1_btn_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
+    # её текст
+    string_rendered = font.render(level_texts[0], True, pygame.Color('black'))
+    screen.blit(string_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
+    # название
+    string_rendered = font.render(title_text, True, pygame.Color('white'))
+    title_rect = 180, 200
+    screen.blit(string_rendered, title_rect)
+
+    global current_level
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if pygame.mouse.get_pos()[0] in range(level1_btn_pos[0], level1_btn_pos[0] + level1_btn_size[0]) \
+                        and pygame.mouse.get_pos()[1] in range(level1_btn_pos[1],
+                                                               level1_btn_pos[1] + level1_btn_size[1]):
+                    current_level = 1
+                    return 'data/level 1.txt'
+        pygame.display.flip()
 
 
 def load_image(name, colorkey=None):
@@ -78,7 +136,7 @@ class Hero:
     def move(self, ax, step):
         if ax == "x":
             if (self.pos[0] + step in range(0, board.width)) and (
-                    level1[board.height - self.pos[1] - 1][self.pos[0] + step] not in (1, 2)):
+                    current_level[board.height - self.pos[1] - 1][self.pos[0] + step] == '-'):
                 if self.direct != step:
                     self.direct = step
                     hero_sprite.image = pygame.transform.flip(hero_sprite.image, True, False)
@@ -87,7 +145,7 @@ class Hero:
 
         else:
             if self.pos[1] + step in range(0, board.height) and (
-                    level1[board.height - self.pos[1] - 1 - step][self.pos[0]] not in (1, 2)):
+                    current_level[board.height - self.pos[1] - 1 - step][self.pos[0]] == '-'):
                 self.pos[1] += step
                 hero_sprite.rect = hero_sprite.rect.move(0, - step * cell_size)
 
@@ -104,7 +162,7 @@ class Skeleton(pygame.sprite.Sprite):
         self.rect.y = board.top + board.cell_size * pos[0]
         self.image = pygame.transform.scale(self.image, (100, 100))
 
-    def move(self):
+    def update(self):
         pass
 
 
@@ -121,39 +179,34 @@ class Wall(pygame.sprite.Sprite):
         self.image = pygame.transform.scale(self.image, (100, 100))
 
 
+class Ground(pygame.sprite.Sprite):
+    image = load_image("ground.jpg")
+
+    def __init__(self, pos, *group):
+        super().__init__(*group)
+        self.image = Ground.image
+        self.rect = self.image.get_rect()
+        self.pos = pos
+        self.rect.x = board.left + board.cell_size * pos[1]
+        self.rect.y = board.top + board.cell_size * pos[0]
+        self.image = pygame.transform.scale(self.image, (100, 100))
+
+
+# SPRITES
+all_sprites = pygame.sprite.Group()
+
 # BOARD
 board = Board(10, 10)
 cell_size = 100
 board.set_view((user_screen[0] - board.width * cell_size) / 2, (user_screen[1] - board.height * cell_size) / 2,
                cell_size)
 
-# SPRITES
-all_sprites = pygame.sprite.Group()
-hero_sprite = pygame.sprite.Sprite()
-hero_sprite.image = load_image("hero wo bg.png")
-hero_sprite.image = pygame.transform.scale(hero_sprite.image, (98, 95))
-hero_sprite.rect = hero_sprite.image.get_rect()
-all_sprites.add(hero_sprite)
-hero_sprite.rect.x = width / 2 - cell_size * (board.width / 2)
-hero_sprite.rect.y = height / 2 + cell_size * (board.height / 2 - 1)
-
-# HERO
-hero = Hero([0, 0])
-
-# WALLS
-for x in range(board.width):
-    for y in range(board.height):
-        if current_level == 1 and level1[x][y] == 1:
-            Wall((x, y), all_sprites)
-
-# SKELETONS
-for x in range(board.width):
-    for y in range(board.height):
-        if current_level == 1 and level1[x][y] == 2:
-            Skeleton((x, y), all_sprites)
+# ЗАГРУЗКА УРОВНЯ
+generate_level(load_level(main_menu()))
 
 # MUSIC
 pygame.mixer.music.load('data/track1.mp3')
+pygame.mixer.music.set_volume(40)
 pygame.mixer.music.play()
 
 # TIMER
@@ -161,17 +214,26 @@ timer = time.monotonic()
 beat = 0.5774
 beat_add = 0.1
 
+# BG
+bg_image = load_image('bg 4 game1.jpg')
+bg_image = pygame.transform.scale(bg_image, user_screen)
+
+bg_image_lighter = load_image('bg 4 game2.jpg')
+bg_image_lighter = pygame.transform.scale(bg_image_lighter, user_screen)
+
 # GAME CYCLE
 held = False
 running = True
 while running:
-    screen.fill(BGCOLOR)
     if time.monotonic() > timer + beat:
         timer = time.monotonic()
+        for sprite in all_sprites:
+            if str(sprite) == '<Skeleton Sprite(in 1 groups)>':
+                sprite.update()
     elif time.monotonic() > timer + beat_add:
-        BGCOLOR = 120, BGCOLOR[1], BGCOLOR[2]
+        screen.blit(bg_image, (0, 0))
     if time.monotonic() > timer + beat - beat_add:
-        BGCOLOR = 160, BGCOLOR[1], BGCOLOR[2]
+        screen.blit(bg_image_lighter, (0, 0))
 
     if pygame.mixer.music.get_pos() % 81000 > 80000:
         pygame.mixer.music.rewind()
