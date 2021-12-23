@@ -25,28 +25,22 @@ def load_level(filename):
 
 def generate_level(level_map):
     level_map = level_map.split()
-    global current_level
-    current_level = level_map
+    board.cur_lvl_map = level_map
+    print(level_map)
     for y in range(len(level_map)):
         for x in range(len(level_map[y])):
             if level_map[y][x] == '-':
-                Ground((y, x), all_sprites)
+                Ground((y, x), tiles)
             elif level_map[y][x] == 'W':
-                Wall((y, x), all_sprites)
-            elif level_map[y][x] == 'S':
-                Ground((y, x), all_sprites)
-                Skeleton((y, x), all_sprites)
-            elif level_map[y][x] == 'P':
-                Ground((y, x), all_sprites)
-                global hero, hero_sprite
-                hero_sprite = pygame.sprite.Sprite()
-                hero_sprite.image = load_image("hero wo bg.png")
-                hero_sprite.image = pygame.transform.scale(hero_sprite.image, (98, 95))
-                hero_sprite.rect = hero_sprite.image.get_rect()
-                hero_sprite.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * x
-                hero_sprite.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (10 - y)
-                hero = Hero([x, 9 - y])
-    all_sprites.add(hero_sprite)
+                Wall((y, x), tiles)
+            elif board.cur_lvl_map[y][x] == 'S':
+                Ground((y, x), tiles)
+                Skeleton((y, x), characters)
+            elif board.cur_lvl_map[y][x] == 'P':
+                Ground((y, x), tiles)
+                hero.pos = [x, 9 - y]
+                hero.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * hero.pos[0]
+                hero.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (hero.pos[1] + 1)
 
 
 def main_menu():
@@ -70,8 +64,6 @@ def main_menu():
     title_rect = 180, 200
     screen.blit(string_rendered, title_rect)
 
-    global current_level
-
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -80,7 +72,7 @@ def main_menu():
                 if pygame.mouse.get_pos()[0] in range(level1_btn_pos[0], level1_btn_pos[0] + level1_btn_size[0]) \
                         and pygame.mouse.get_pos()[1] in range(level1_btn_pos[1],
                                                                level1_btn_pos[1] + level1_btn_size[1]):
-                    current_level = 1
+                    board.cur_lvl_num = 1
                     return 'data/level 1.txt'
         pygame.display.flip()
 
@@ -112,6 +104,8 @@ class Board:
         self.left = 10
         self.top = 10
         self.cell_size = 30
+        self.cur_lvl_num = 0
+        self.cur_lvl_map = []
 
     # настройка внешнего вида
     def set_view(self, left, top, cell_size):
@@ -128,26 +122,33 @@ class Board:
                              (self.left + self.cell_size * self.width, self.top + self.cell_size * i), 7)
 
 
-class Hero:
-    def __init__(self, pos, direct=1):
+class Hero(pygame.sprite.Sprite):
+    image = load_image("hero wo bg.png")
+
+    def __init__(self, pos, *group, direct=1):
+        super().__init__(*group)
         self.pos = pos
         self.direct = direct
+        self.image = Hero.image
+        self.rect = self.image.get_rect()
+        self.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * pos[0]
+        self.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (9 - pos[1])
 
     def move(self, ax, step):
         if ax == "x":
             if (self.pos[0] + step in range(0, board.width)) and (
-                    current_level[board.height - self.pos[1] - 1][self.pos[0] + step] == '-'):
+                    board.cur_lvl_map[board.height - self.pos[1] - 1][self.pos[0] + step] in ('P', '-')):
                 if self.direct != step:
                     self.direct = step
-                    hero_sprite.image = pygame.transform.flip(hero_sprite.image, True, False)
+                    self.image = pygame.transform.flip(self.image, True, False)
                 self.pos[0] += step
-                hero_sprite.rect = hero_sprite.rect.move(step * cell_size, 0)
+                self.rect = self.rect.move(step * cell_size, 0)
 
         else:
             if self.pos[1] + step in range(0, board.height) and (
-                    current_level[board.height - self.pos[1] - 1 - step][self.pos[0]] == '-'):
+                    board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] in ('P', '-')):
                 self.pos[1] += step
-                hero_sprite.rect = hero_sprite.rect.move(0, - step * cell_size)
+                self.rect = self.rect.move(0, - step * cell_size)
 
 
 class Skeleton(pygame.sprite.Sprite):
@@ -193,13 +194,18 @@ class Ground(pygame.sprite.Sprite):
 
 
 # SPRITES
-all_sprites = pygame.sprite.Group()
+tiles = pygame.sprite.Group()
+characters = pygame.sprite.Group()
 
 # BOARD
 board = Board(10, 10)
 cell_size = 100
 board.set_view((user_screen[0] - board.width * cell_size) / 2, (user_screen[1] - board.height * cell_size) / 2,
                cell_size)
+
+# HERO
+hero = Hero((0, 0))
+characters.add(hero)
 
 # ЗАГРУЗКА УРОВНЯ
 generate_level(load_level(main_menu()))
@@ -227,7 +233,7 @@ running = True
 while running:
     if time.monotonic() > timer + beat:
         timer = time.monotonic()
-        for sprite in all_sprites:
+        for sprite in characters:
             if str(sprite) == '<Skeleton Sprite(in 1 groups)>':
                 sprite.update()
     elif time.monotonic() > timer + beat_add:
@@ -260,5 +266,6 @@ while running:
         if event.type == pygame.KEYUP:
             held = False
     board.render(screen)
-    all_sprites.draw(screen)
+    tiles.draw(screen)
+    characters.draw(screen)
     pygame.display.flip()
