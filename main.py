@@ -2,6 +2,7 @@ import pygame
 import sys
 import os
 import time
+import random
 
 BGCOLOR = (120, 40, 30)
 NETCOLOR = (80, 20, 10)
@@ -26,7 +27,6 @@ def load_level(filename):
 def generate_level(level_map):
     level_map = level_map.split()
     board.cur_lvl_map = level_map
-    print(level_map)
     for y in range(len(level_map)):
         for x in range(len(level_map[y])):
             if level_map[y][x] == '-':
@@ -44,7 +44,7 @@ def generate_level(level_map):
 
 
 def main_menu():
-    title_text = "НАЗВАНИЕ"
+    title_text = "Ковбой против скелетов (не финальное название)"
     level_texts = ["1 УРОВЕНЬ", "2 УРОВЕНЬ", "3 УРОВЕНЬ"]
     level1_btn_pos = (140, 380)
     level1_btn_size = (300, 100)
@@ -123,32 +123,67 @@ class Board:
 
 
 class Hero(pygame.sprite.Sprite):
-    image = load_image("hero wo bg.png")
+    image_st = load_image("hero wo bg.png")
+    image_st = pygame.transform.scale(image_st, (98, 98))
+
+    image_mv = load_image("hero moving wo bg.png")
+    image_mv = pygame.transform.scale(image_mv, (86, 115))
 
     def __init__(self, pos, *group, direct=1):
         super().__init__(*group)
         self.pos = pos
         self.direct = direct
-        self.image = Hero.image
-        self.rect = self.image.get_rect()
+        self.moved = 0
+        self.rect = self.image_st.get_rect()
         self.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * pos[0]
         self.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (9 - pos[1])
+        self.image = Hero.image_st
+        self.animated = False
+        self.last_anim = 'y'
 
     def move(self, ax, step):
+        if time.monotonic() - self.moved < 0.4:
+            return
+        self.moved = time.monotonic()
         if ax == "x":
             if (self.pos[0] + step in range(0, board.width)) and (
                     board.cur_lvl_map[board.height - self.pos[1] - 1][self.pos[0] + step] in ('P', '-')):
-                if self.direct != step:
-                    self.direct = step
-                    self.image = pygame.transform.flip(self.image, True, False)
+                self.direct = step
                 self.pos[0] += step
-                self.rect = self.rect.move(step * cell_size, 0)
+                self.animation(1, ax)
 
         else:
             if self.pos[1] + step in range(0, board.height) and (
                     board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] in ('P', '-')):
+                self.direct = step
                 self.pos[1] += step
-                self.rect = self.rect.move(0, - step * cell_size)
+                self.animation(1, ax)
+
+    def animation(self, v, ax):
+        if ax == 'x':
+            self.last_anim = 'x'
+            if v:
+                self.rect.y -= 15
+                self.image = Hero.image_mv
+                self.animated = True
+            else:
+                self.rect.y += 15
+                self.image = Hero.image_st
+                self.animated = False
+            self.rect.x += self.direct * cell_size // 2
+            if self.direct == -1:
+                self.image = pygame.transform.flip(self.image, True, False)
+        else:
+            self.last_anim = 'y'
+            if v:
+                self.image = Hero.image_mv
+                self.animated = True
+            else:
+                self.image = Hero.image_st
+                self.animated = False
+            self.rect.y -= cell_size // 2 * self.direct
+            if self.direct == -1:
+                self.image = pygame.transform.flip(self.image, True, False)
 
 
 class Skeleton(pygame.sprite.Sprite):
@@ -181,11 +216,15 @@ class Wall(pygame.sprite.Sprite):
 
 
 class Ground(pygame.sprite.Sprite):
-    image = load_image("ground.jpg")
 
     def __init__(self, pos, *group):
         super().__init__(*group)
-        self.image = Ground.image
+        if random.randint(0, 1):
+            image = load_image("ground_tile2.jpg")
+            image = pygame.transform.rotate(image, random.randint(0, 3) * 90)
+        else:
+            image = load_image("ground_tile2.jpg")
+        self.image = image
         self.rect = self.image.get_rect()
         self.pos = pos
         self.rect.x = board.left + board.cell_size * pos[1]
@@ -265,6 +304,9 @@ while running:
                     held = True
         if event.type == pygame.KEYUP:
             held = False
+    if time.monotonic() - hero.moved > 0.15:
+        if hero.animated:
+            hero.animation(0, hero.last_anim)
     board.render(screen)
     tiles.draw(screen)
     characters.draw(screen)
