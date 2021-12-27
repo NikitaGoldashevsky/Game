@@ -25,9 +25,14 @@ def load_level(filename):
 
 
 def generate_level(level_map):
-    level_map = level_map.split()
+    map_len_y = int(level_map.split()[0])
+    level_map = level_map.split()[1:]
     board.cur_lvl_map = level_map
-    for y in range(len(level_map)):
+    for i in range(map_len_y):
+        level_map[i] = list(level_map[i])
+    board.cur_lvl_map = level_map[:map_len_y]
+    cur_path = 0
+    for y in range(map_len_y):
         for x in range(len(level_map[y])):
             if level_map[y][x] == '-':
                 Ground((y, x), tiles)
@@ -35,7 +40,8 @@ def generate_level(level_map):
                 Wall((y, x), tiles)
             elif board.cur_lvl_map[y][x] == 'S':
                 Ground((y, x), tiles)
-                Skeleton((y, x), characters)
+                Skeleton((x, 9 - y), level_map[map_len_y + cur_path], characters)
+                cur_path += 1
             elif board.cur_lvl_map[y][x] == 'P':
                 Ground((y, x), tiles)
                 hero.pos = [x, 9 - y]
@@ -142,6 +148,7 @@ class Hero(pygame.sprite.Sprite):
         self.last_anim = 'y'
 
     def move(self, ax, step):
+        last_pos = self.pos[0], self.pos[1]
         if time.monotonic() - self.moved < 0.4:
             return
         self.moved = time.monotonic()
@@ -151,13 +158,18 @@ class Hero(pygame.sprite.Sprite):
                 self.direct = step
                 self.pos[0] += step
                 self.animation(1, ax)
-
+            else:
+                return
         else:
             if self.pos[1] + step in range(0, board.height) and (
                     board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] in ('P', '-')):
                 self.direct = step
                 self.pos[1] += step
                 self.animation(1, ax)
+            else:
+                return
+        board.cur_lvl_map[9 - last_pos[1]][last_pos[0]] = '-'
+        board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'P'
 
     def animation(self, v, ax):
         if ax == 'x':
@@ -189,17 +201,41 @@ class Hero(pygame.sprite.Sprite):
 class Skeleton(pygame.sprite.Sprite):
     image = load_image("skeleton wo bg.png")
 
-    def __init__(self, pos, *group):
+    def __init__(self, pos, path, *group):
         super().__init__(*group)
         self.image = Skeleton.image
         self.rect = self.image.get_rect()
         self.pos = pos
-        self.rect.x = board.left + board.cell_size * pos[1]
-        self.rect.y = board.top + board.cell_size * pos[0]
+        self.rect.y = board.top + board.cell_size * (9 - pos[1])
+        self.rect.x = board.left + board.cell_size * pos[0]
         self.image = pygame.transform.scale(self.image, (100, 100))
+        self.direct = 1
+        self.path = path
+        self.path_len = len(path)
+        print(self.pos)
 
     def update(self):
-        pass
+        self.path = self.path[1:] + self.path[0]
+        self.move(self.path[0])
+
+    def move(self, dir):
+        board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = '-'
+        if self.direct == 1 and dir == 'l' or self.direct == 0 and dir == 'r':
+            self.direct = (self.direct + 1) % 2
+            self.image = pygame.transform.flip(self.image, True, False)
+        if dir == 'u':
+            self.pos = self.pos[0], self.pos[1] + 1
+            self.rect.y -= cell_size
+        elif dir == 'd':
+            self.pos = self.pos[0], self.pos[1] - 1
+            self.rect.y += cell_size
+        elif dir == 'r':
+            self.pos = self.pos[0] + 1, self.pos[1]
+            self.rect.x += cell_size
+        elif dir == 'l':
+            self.pos = self.pos[0] - 1, self.pos[1]
+            self.rect.x -= cell_size
+        board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'S'
 
 
 class Wall(pygame.sprite.Sprite):
@@ -275,6 +311,9 @@ while running:
         for sprite in characters:
             if str(sprite) == '<Skeleton Sprite(in 1 groups)>':
                 sprite.update()
+        #for el in board.cur_lvl_map:
+        #    print(el)
+        #print('.')
     elif time.monotonic() > timer + beat_add:
         screen.blit(bg_image, (0, 0))
     if time.monotonic() > timer + beat - beat_add:
