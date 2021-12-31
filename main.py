@@ -112,6 +112,7 @@ class Board:
         self.cell_size = 30
         self.cur_lvl_num = 0
         self.cur_lvl_map = []
+        self.skeletons = []
 
     # настройка внешнего вида
     def set_view(self, left, top, cell_size):
@@ -146,6 +147,7 @@ class Hero(pygame.sprite.Sprite):
         self.image = Hero.image_st
         self.animated = False
         self.last_anim = 'y'
+        self.near = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
     def move(self, ax, step):
         last_pos = self.pos[0], self.pos[1]
@@ -175,11 +177,11 @@ class Hero(pygame.sprite.Sprite):
         if ax == 'x':
             self.last_anim = 'x'
             if v:
-                self.rect.y -= 15
+                self.rect.y -= 25
                 self.image = Hero.image_mv
                 self.animated = True
             else:
-                self.rect.y += 15
+                self.rect.y += 25
                 self.image = Hero.image_st
                 self.animated = False
             self.rect.x += self.direct * cell_size // 2
@@ -197,22 +199,33 @@ class Hero(pygame.sprite.Sprite):
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
 
+    def enemies_near(self):
+        n = 0
+        for i in range(4):
+            if 9 - self.pos[1] + self.near[i][1] in range(0, board.width) and self.pos[0] + self.near[i][0] in \
+                    range(0, board.height):
+                if board.cur_lvl_map[9 - self.pos[1] + self.near[i][1]][self.pos[0] + self.near[i][0]] == "S":
+                    n += 1
+        return n
+
 
 class Skeleton(pygame.sprite.Sprite):
-    image = load_image("skeleton wo bg.png")
 
     def __init__(self, pos, path, *group):
         super().__init__(*group)
-        self.image = Skeleton.image
+        self.image_st = load_image("skeleton wo bg.png")
+        self.image_mv = load_image("skeleton moving wo bg.png")
+        self.image_mv = pygame.transform.scale(self.image_mv, (84, 90))
+        self.image = self.image_st
         self.rect = self.image.get_rect()
         self.pos = pos
         self.rect.y = board.top + board.cell_size * (9 - pos[1])
         self.rect.x = board.left + board.cell_size * pos[0]
-        self.image = pygame.transform.scale(self.image, (100, 100))
         self.direct = 1
         self.path = path
         self.path_len = len(path)
-        print(self.pos)
+        board.skeletons.append(self)
+        self.animated = False
 
     def update(self):
         self.path = self.path[1:] + self.path[0]
@@ -220,22 +233,49 @@ class Skeleton(pygame.sprite.Sprite):
 
     def move(self, dir):
         board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = '-'
-        if self.direct == 1 and dir == 'l' or self.direct == 0 and dir == 'r':
-            self.direct = (self.direct + 1) % 2
+        if self.direct == 1 and dir == 'l' or self.direct == -1 and dir == 'r' or self.direct == 1 and dir == 'd' \
+                or self.direct == -1 and dir == 'u':
+            self.direct *= -1
             self.image = pygame.transform.flip(self.image, True, False)
         if dir == 'u':
             self.pos = self.pos[0], self.pos[1] + 1
-            self.rect.y -= cell_size
+            self.animation(1, 'y')
         elif dir == 'd':
             self.pos = self.pos[0], self.pos[1] - 1
-            self.rect.y += cell_size
+            self.animation(1, 'y')
         elif dir == 'r':
             self.pos = self.pos[0] + 1, self.pos[1]
-            self.rect.x += cell_size
+            self.animation(1, 'x')
         elif dir == 'l':
             self.pos = self.pos[0] - 1, self.pos[1]
-            self.rect.x -= cell_size
+            self.animation(1, 'x')
         board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'S'
+
+    def animation(self, v, ax):
+        if ax == 'x':
+            self.last_anim = 'x'
+            if v:
+                self.rect.y -= 14
+                self.image = self.image_mv
+                self.animated = True
+            else:
+                self.rect.y += 14
+                self.image = self.image_st
+                self.animated = False
+            self.rect.x += self.direct * cell_size // 2
+            if self.direct == -1:
+                self.image = pygame.transform.flip(self.image, True, False)
+        else:
+            self.last_anim = 'y'
+            if v:
+                self.image = self.image_mv
+                self.animated = True
+            else:
+                self.image = self.image_st
+                self.animated = False
+            self.rect.y -= cell_size // 2 * self.direct
+            if self.direct == -1:
+                self.image = pygame.transform.flip(self.image, True, False)
 
 
 class Wall(pygame.sprite.Sprite):
@@ -308,12 +348,8 @@ running = True
 while running:
     if time.monotonic() > timer + beat:
         timer = time.monotonic()
-        for sprite in characters:
-            if str(sprite) == '<Skeleton Sprite(in 1 groups)>':
-                sprite.update()
-        #for el in board.cur_lvl_map:
-        #    print(el)
-        #print('.')
+        for sk in board.skeletons:
+            sk.update()
     elif time.monotonic() > timer + beat_add:
         screen.blit(bg_image, (0, 0))
     if time.monotonic() > timer + beat - beat_add:
@@ -329,16 +365,16 @@ while running:
         keys = pygame.key.get_pressed()
         if event.type == pygame.KEYDOWN:
             if not held and (time.monotonic() > timer + beat - beat_add * 2 or time.monotonic() - beat_add * 2 < timer):
-                if keys[pygame.K_UP]:
+                if keys[pygame.K_UP] or keys[pygame.K_w]:
                     hero.move('y', 1)
                     held = True
-                elif keys[pygame.K_DOWN]:
+                elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
                     hero.move('y', -1)
                     held = True
-                elif keys[pygame.K_LEFT]:
+                elif keys[pygame.K_LEFT] or keys[pygame.K_a]:
                     hero.move('x', -1)
                     held = True
-                elif keys[pygame.K_RIGHT]:
+                elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
                     hero.move('x', 1)
                     held = True
         if event.type == pygame.KEYUP:
@@ -346,6 +382,12 @@ while running:
     if time.monotonic() - hero.moved > 0.15:
         if hero.animated:
             hero.animation(0, hero.last_anim)
+    if time.monotonic() - timer > 0.1:
+        for sk in board.skeletons:
+            if sk.animated:
+                sk.animation(0, sk.last_anim)
+    if hero.enemies_near():
+        pass
     board.render(screen)
     tiles.draw(screen)
     characters.draw(screen)
