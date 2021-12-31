@@ -5,7 +5,7 @@ import time
 import random
 
 BGCOLOR = (120, 40, 30)
-NETCOLOR = (80, 20, 10)
+NETCOLOR = (40, 10, 5)
 
 pygame.init()
 user_screen = 1920, 1080
@@ -83,6 +83,100 @@ def main_menu():
         pygame.display.flip()
 
 
+def beginning():
+    global board, tiles, characters, cell_size, hero
+
+    # SPRITES
+    tiles = pygame.sprite.Group()
+    characters = pygame.sprite.Group()
+
+    # BOARD
+    board = Board(10, 10)
+    cell_size = 100
+    board.set_view((user_screen[0] - board.width * cell_size) / 2, (user_screen[1] - board.height * cell_size) / 2,
+                   cell_size)
+
+    # HERO
+    hero = Hero((0, 0))
+    characters.add(hero)
+
+    # ЗАГРУЗКА УРОВНЯ
+    generate_level(load_level(main_menu()))
+    start_level()
+
+
+def start_level():
+    # MUSIC
+    pygame.mixer.music.load('data/track1.mp3')
+    pygame.mixer.music.set_volume(40)
+    pygame.mixer.music.play()
+
+    # TIMER
+    timer = time.monotonic()
+    beat = 0.5774
+    beat_add = 0.1
+
+    # BG
+    bg_image = load_image('bg 4 game1.jpg')
+    bg_image = pygame.transform.scale(bg_image, user_screen)
+
+    bg_image_lighter = load_image('bg 4 game2.jpg')
+    bg_image_lighter = pygame.transform.scale(bg_image_lighter, user_screen)
+
+    held = False
+    running = True
+    while running:
+        if time.monotonic() > timer + beat:
+            timer = time.monotonic()
+            for sk in board.skeletons:
+                sk.update()
+        elif time.monotonic() > timer + beat_add:
+            screen.blit(bg_image, (0, 0))
+        if time.monotonic() > timer + beat - beat_add:
+            screen.blit(bg_image_lighter, (0, 0))
+
+        if pygame.mixer.music.get_pos() % 81000 > 80000:
+            pygame.mixer.music.rewind()
+            timer = time.monotonic()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            keys = pygame.key.get_pressed()
+            if event.type == pygame.KEYDOWN:
+                if keys[pygame.K_ESCAPE]:
+                    beginning()
+                if not held and (
+                        time.monotonic() > timer + beat - beat_add * 2 or time.monotonic() - beat_add * 2 < timer):
+                    if keys[pygame.K_UP] or keys[pygame.K_w]:
+                        hero.move('y', 1)
+                        held = True
+                    elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
+                        hero.move('y', -1)
+                        held = True
+                    elif keys[pygame.K_LEFT] or keys[pygame.K_a]:
+                        hero.move('x', -1)
+                        held = True
+                    elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+                        hero.move('x', 1)
+                        held = True
+            if event.type == pygame.KEYUP:
+                held = False
+        if time.monotonic() - hero.moved > 0.15:
+            if hero.animated:
+                hero.animation(0, hero.last_anim)
+        if time.monotonic() - timer > 0.1:
+            for sk in board.skeletons:
+                if sk.animated:
+                    sk.animation(0, sk.last_anim)
+        if hero.enemies_near():
+            pass
+        board.render(screen)
+        tiles.draw(screen)
+        characters.draw(screen)
+        pygame.display.flip()
+
+
 def load_image(name, colorkey=None):
     fullname = os.path.join('data', name)
     if not os.path.isfile(fullname):
@@ -121,12 +215,12 @@ class Board:
         self.cell_size = cell_size
 
     def render(self, screen):
-        for i in range(self.width + 1):
+        for i in (0, self.width):
             pygame.draw.line(screen, NETCOLOR, (i * self.cell_size + self.left, self.top),
-                             (i * self.cell_size + self.left, self.top + self.cell_size * self.height), 7)
-        for i in range(self.height + 1):
+                             (i * self.cell_size + self.left, self.top + self.cell_size * self.height), 14)
+        for i in (0, self.height):
             pygame.draw.line(screen, NETCOLOR, (self.left, self.top + self.cell_size * i),
-                             (self.left + self.cell_size * self.width, self.top + self.cell_size * i), 7)
+                             (self.left + self.cell_size * self.width, self.top + self.cell_size * i), 14)
 
 
 class Hero(pygame.sprite.Sprite):
@@ -308,87 +402,5 @@ class Ground(pygame.sprite.Sprite):
         self.image = pygame.transform.scale(self.image, (100, 100))
 
 
-# SPRITES
-tiles = pygame.sprite.Group()
-characters = pygame.sprite.Group()
-
-# BOARD
-board = Board(10, 10)
-cell_size = 100
-board.set_view((user_screen[0] - board.width * cell_size) / 2, (user_screen[1] - board.height * cell_size) / 2,
-               cell_size)
-
-# HERO
-hero = Hero((0, 0))
-characters.add(hero)
-
-# ЗАГРУЗКА УРОВНЯ
-generate_level(load_level(main_menu()))
-
-# MUSIC
-pygame.mixer.music.load('data/track1.mp3')
-pygame.mixer.music.set_volume(40)
-pygame.mixer.music.play()
-
-# TIMER
-timer = time.monotonic()
-beat = 0.5774
-beat_add = 0.1
-
-# BG
-bg_image = load_image('bg 4 game1.jpg')
-bg_image = pygame.transform.scale(bg_image, user_screen)
-
-bg_image_lighter = load_image('bg 4 game2.jpg')
-bg_image_lighter = pygame.transform.scale(bg_image_lighter, user_screen)
-
-# GAME CYCLE
-held = False
-running = True
-while running:
-    if time.monotonic() > timer + beat:
-        timer = time.monotonic()
-        for sk in board.skeletons:
-            sk.update()
-    elif time.monotonic() > timer + beat_add:
-        screen.blit(bg_image, (0, 0))
-    if time.monotonic() > timer + beat - beat_add:
-        screen.blit(bg_image_lighter, (0, 0))
-
-    if pygame.mixer.music.get_pos() % 81000 > 80000:
-        pygame.mixer.music.rewind()
-        timer = time.monotonic()
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        keys = pygame.key.get_pressed()
-        if event.type == pygame.KEYDOWN:
-            if not held and (time.monotonic() > timer + beat - beat_add * 2 or time.monotonic() - beat_add * 2 < timer):
-                if keys[pygame.K_UP] or keys[pygame.K_w]:
-                    hero.move('y', 1)
-                    held = True
-                elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
-                    hero.move('y', -1)
-                    held = True
-                elif keys[pygame.K_LEFT] or keys[pygame.K_a]:
-                    hero.move('x', -1)
-                    held = True
-                elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-                    hero.move('x', 1)
-                    held = True
-        if event.type == pygame.KEYUP:
-            held = False
-    if time.monotonic() - hero.moved > 0.15:
-        if hero.animated:
-            hero.animation(0, hero.last_anim)
-    if time.monotonic() - timer > 0.1:
-        for sk in board.skeletons:
-            if sk.animated:
-                sk.animation(0, sk.last_anim)
-    if hero.enemies_near():
-        pass
-    board.render(screen)
-    tiles.draw(screen)
-    characters.draw(screen)
-    pygame.display.flip()
+# Начало
+beginning()
