@@ -70,10 +70,16 @@ def main_menu():
     title_rect = 180, 200
     screen.blit(string_rendered, title_rect)
 
+    pygame.mixer.music.load('data/menu music.mp3')
+    pygame.mixer.music.set_volume(30)
+    pygame.mixer.music.play()
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    terminate()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if pygame.mouse.get_pos()[0] in range(level1_btn_pos[0], level1_btn_pos[0] + level1_btn_size[0]) \
                         and pygame.mouse.get_pos()[1] in range(level1_btn_pos[1],
@@ -108,7 +114,7 @@ def beginning():
 def start_level():
     # MUSIC
     pygame.mixer.music.load('data/track1.mp3')
-    pygame.mixer.music.set_volume(40)
+    pygame.mixer.music.set_volume(30)
     pygame.mixer.music.play()
 
     # TIMER
@@ -125,6 +131,7 @@ def start_level():
 
     held = False
     running = True
+    screen.blit(bg_image, (0, 0))
     while running:
         if time.monotonic() > timer + beat:
             timer = time.monotonic()
@@ -145,6 +152,7 @@ def start_level():
             keys = pygame.key.get_pressed()
             if event.type == pygame.KEYDOWN:
                 if keys[pygame.K_ESCAPE]:
+                    pygame.mixer.music.stop()
                     beginning()
                 if not held and (
                         time.monotonic() > timer + beat - beat_add * 2 or time.monotonic() - beat_add * 2 < timer):
