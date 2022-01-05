@@ -42,17 +42,20 @@ def generate_level(level_map):
                 Ground((y, x), tiles)
                 Skeleton((x, 9 - y), level_map[map_len_y + cur_path], characters)
                 cur_path += 1
+            elif board.cur_lvl_map[y][x] == 'T':
+                Trap((y, x), traps)
             elif board.cur_lvl_map[y][x] == 'P':
                 Ground((y, x), tiles)
                 hero.pos = [x, 9 - y]
                 hero.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * hero.pos[0]
                 hero.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (hero.pos[1] + 1)
+                board.cur_lvl_map[y][x] = '-'
 
 
 def main_menu():
-    title_text = "Ковбой против скелетов (не финальное название)"
+    title_text = "Название"
     level_texts = ["1 УРОВЕНЬ", "2 УРОВЕНЬ", "3 УРОВЕНЬ"]
-    level1_btn_pos = (140, 380)
+    level1_btn_pos = (160, 380)
     level1_btn_size = (300, 100)
 
     fon = pygame.transform.scale(load_image('bg 4 menu.jpg'), user_screen)
@@ -63,12 +66,12 @@ def main_menu():
     pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level1_btn_pos, level1_btn_size))
     pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
     # её текст
-    string_rendered = font.render(level_texts[0], True, pygame.Color('black'))
-    screen.blit(string_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
+    button_rendered = font.render(level_texts[0], True, pygame.Color('black'))
+
     # название
-    string_rendered = font.render(title_text, True, pygame.Color('white'))
+    title_rendered = font.render(title_text, True, pygame.Color('white'))
     title_rect = 180, 200
-    screen.blit(string_rendered, title_rect)
+    screen.blit(title_rendered, title_rect)
 
     pygame.mixer.music.load('data/menu music.mp3')
     pygame.mixer.music.set_volume(30)
@@ -80,21 +83,29 @@ def main_menu():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     terminate()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if pygame.mouse.get_pos()[0] in range(level1_btn_pos[0], level1_btn_pos[0] + level1_btn_size[0]) \
-                        and pygame.mouse.get_pos()[1] in range(level1_btn_pos[1],
-                                                               level1_btn_pos[1] + level1_btn_size[1]):
+            elif pygame.mouse.get_pos()[0] in range(level1_btn_pos[0], level1_btn_pos[0] + level1_btn_size[0]) and \
+                    pygame.mouse.get_pos()[1] in range(level1_btn_pos[1], level1_btn_pos[1] + level1_btn_size[1]):
+                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level1_btn_pos, level1_btn_size))
+                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
+                screen.blit(button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pygame.mixer.Sound('data/click.mp3').play()
                     board.cur_lvl_num = 1
                     return 'data/level 1.txt'
+            else:
+                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level1_btn_pos, level1_btn_size))
+                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
+                screen.blit(button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
         pygame.display.flip()
 
 
-def beginning():
-    global board, tiles, characters, cell_size, hero
+def beginning(level=0):
+    global board, tiles, characters, cell_size, hero, traps
 
     # SPRITES
     tiles = pygame.sprite.Group()
     characters = pygame.sprite.Group()
+    traps = pygame.sprite.Group()
 
     # BOARD
     board = Board(10, 10)
@@ -107,7 +118,11 @@ def beginning():
     characters.add(hero)
 
     # ЗАГРУЗКА УРОВНЯ
-    generate_level(load_level(main_menu()))
+    if not level:
+        generate_level(load_level(main_menu()))
+    else:
+        generate_level(load_level(f'data/level {level}.txt'))
+        board.cur_lvl_num = level
     start_level()
 
 
@@ -119,7 +134,7 @@ def start_level():
 
     # TIMER
     timer = time.monotonic()
-    beat = 0.5774
+    beat = 0.58
     beat_add = 0.1
 
     # BG
@@ -137,6 +152,7 @@ def start_level():
             timer = time.monotonic()
             for sk in board.skeletons:
                 sk.update()
+            traps.update()
         elif time.monotonic() > timer + beat_add:
             screen.blit(bg_image, (0, 0))
         if time.monotonic() > timer + beat - beat_add:
@@ -152,8 +168,11 @@ def start_level():
             keys = pygame.key.get_pressed()
             if event.type == pygame.KEYDOWN:
                 if keys[pygame.K_ESCAPE]:
-                    pygame.mixer.music.stop()
-                    beginning()
+                    dif = time.monotonic() - timer
+                    screen.blit(bg_image, (0, 0))
+                    pygame.mixer.Sound('data/click.mp3').play()
+                    pause()
+                    timer = time.monotonic() - dif
                 if not held and (
                         time.monotonic() > timer + beat - beat_add * 2 or time.monotonic() - beat_add * 2 < timer):
                     if keys[pygame.K_UP] or keys[pygame.K_w]:
@@ -177,11 +196,166 @@ def start_level():
             for sk in board.skeletons:
                 if sk.animated:
                     sk.animation(0, sk.last_anim)
-        if hero.enemies_near():
-            pass
+        if hero.death():
+            end_screen()
         board.render(screen)
         tiles.draw(screen)
+        traps.draw(screen)
         characters.draw(screen)
+        pygame.display.flip()
+
+
+def pause():
+    pygame.mixer.music.pause()
+    text_top = "Пауза"
+    retry_text = "Начать заново"
+    retry_btn_pos = (user_screen[0] // 3, user_screen[1] // 2)
+    retry_btn_size = retry_btn_pos[0] - 30, user_screen[1] // 6 - 40
+    return_text = 'Главное меню'
+    return_btn_pos = (user_screen[0] // 3, user_screen[1] * 2 // 3)
+    return_btn_size = return_btn_pos[0] - 30, user_screen[1] // 6 - 40
+    cont_text = 'Продолжить'
+    cont_btn_pos = (user_screen[0] // 3, user_screen[1] // 3)
+    cont_btn_size = cont_btn_pos[0] - 30, user_screen[1] // 6 - 40
+    font = pygame.font.Font(None, 60)
+
+    text_top_rendered = font.render(text_top, True, pygame.Color('black'))
+    retry_text_rendered = font.render(retry_text, True, pygame.Color('black'))
+    return_text_rendered = font.render(return_text, True, pygame.Color('black'))
+    cont_text_rendered = font.render(cont_text, True, pygame.Color('black'))
+    text_top_rect = (user_screen[0] - text_top_rendered.get_rect()[2]) // 2, user_screen[1] // 6 + 40
+
+    pygame.draw.rect(screen, (100, 30, 20),
+                     pygame.Rect(user_screen[0] // 3 - 30, user_screen[1] // 6 - 30, user_screen[0] // 3 + 30,
+                                 user_screen[1] * 2 // 3 + 30))
+    pygame.draw.rect(screen, (30, 30, 20),
+                     pygame.Rect(user_screen[0] // 3 - 30, user_screen[1] // 6 - 30, user_screen[0] // 3 + 30,
+                                 user_screen[1] * 2 // 3 + 30), 9)
+
+    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(retry_btn_pos, retry_btn_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
+
+    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(return_btn_pos, return_btn_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
+
+    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(cont_btn_pos, cont_btn_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(cont_btn_pos, cont_btn_size), 8)
+
+    screen.blit(retry_text_rendered, (retry_btn_pos[0] + 20, retry_btn_pos[1] + 50))
+    screen.blit(return_text_rendered, (return_btn_pos[0] + 20, return_btn_pos[1] + 50))
+    screen.blit(cont_text_rendered, (cont_btn_pos[0] + 20, cont_btn_pos[1] + 50))
+    screen.blit(text_top_rendered, text_top_rect)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif pygame.mouse.get_pos()[0] in range(retry_btn_pos[0], retry_btn_pos[0] + retry_btn_size[0]) and \
+                    pygame.mouse.get_pos()[1] in range(retry_btn_pos[1], retry_btn_pos[1] + retry_btn_size[1]):
+                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(retry_btn_pos, retry_btn_size))
+                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pygame.mixer.Sound('data/click.mp3').play()
+                    beginning(board.cur_lvl_num)
+            else:
+                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(retry_btn_pos, retry_btn_size))
+                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
+            screen.blit(retry_text_rendered, (retry_btn_pos[0] + 20, retry_btn_pos[1] + 50))
+            # --------------
+            if pygame.mouse.get_pos()[0] in range(return_btn_pos[0], return_btn_pos[0] + return_btn_size[0]) and \
+                    pygame.mouse.get_pos()[1] in range(return_btn_pos[1], return_btn_pos[1] + return_btn_size[1]):
+                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(return_btn_pos, return_btn_size))
+                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pygame.mixer.Sound('data/click.mp3').play()
+                    beginning()
+            else:
+                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(return_btn_pos, return_btn_size))
+                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
+            screen.blit(return_text_rendered, (return_btn_pos[0] + 20, return_btn_pos[1] + 50))
+            # --------------
+            if pygame.mouse.get_pos()[0] in range(cont_btn_pos[0], cont_btn_pos[0] + cont_btn_size[0]) and \
+                    pygame.mouse.get_pos()[1] in range(cont_btn_pos[1], cont_btn_pos[1] + cont_btn_size[1]):
+                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(cont_btn_pos, cont_btn_size))
+                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(cont_btn_pos, cont_btn_size), 8)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pygame.mixer.Sound('data/click.mp3').play()
+                    pygame.mixer.music.unpause()
+                    return
+            else:
+                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(cont_btn_pos, cont_btn_size))
+                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(cont_btn_pos, cont_btn_size), 8)
+            screen.blit(cont_text_rendered, (cont_btn_pos[0] + 20, cont_btn_pos[1] + 50))
+        pygame.display.flip()
+
+
+def end_screen():
+    pygame.mixer.music.pause()
+    text_top = "Вы проиграли!"
+    advice = random.choice(('Двигайтесь в одном ритме с музыкой', 'Избегайте столкновений с врагами',
+                            'Переходите через шипы тогда, когда они скрыты'))
+    retry_text = "Начать заново"
+    retry_btn_pos = (520, 640)
+    retry_btn_size = (340, 150)
+    return_text = 'Главное меню'
+    return_btn_pos = (1060, 640)
+    return_btn_size = (340, 150)
+
+    fon = pygame.transform.scale(load_image('bg 4 game1.jpg'), user_screen)
+    screen.blit(fon, (0, 0))
+    font = pygame.font.Font(None, 60)
+    adv_font = pygame.font.Font(None, 52)
+
+    advice_rendered = adv_font.render(advice, True, pygame.Color('black'))
+    text_top_rendered = font.render(text_top, True, pygame.Color('black'))
+    text_top_rect = (user_screen[0] - text_top_rendered.get_rect()[2]) // 2, user_screen[1] // 4 + 110
+    advice_rect = (user_screen[0] - advice_rendered.get_rect()[2]) // 2, text_top_rect[1] + 110
+    retry_text_rendered = font.render(retry_text, True, pygame.Color('black'))
+    return_text_rendered = font.render(return_text, True, pygame.Color('black'))
+    screen.blit(text_top_rendered, text_top_rect)
+
+    pygame.draw.rect(screen, (100, 30, 20),
+                     pygame.Rect(user_screen[0] // 4, user_screen[1] // 4, user_screen[0] // 2,
+                                 user_screen[1] // 2))
+    pygame.draw.rect(screen, (30, 30, 20),
+                     pygame.Rect(user_screen[0] // 4, user_screen[1] // 4, user_screen[0] // 2,
+                                 user_screen[1] // 2), 10)
+    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(retry_btn_pos, retry_btn_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
+
+    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(return_btn_pos, return_btn_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
+
+    screen.blit(retry_text_rendered, (retry_btn_pos[0] + 20, retry_btn_pos[1] + 50))
+    screen.blit(return_text_rendered, (return_btn_pos[0] + 20, return_btn_pos[1] + 50))
+    screen.blit(text_top_rendered, text_top_rect)
+    screen.blit(advice_rendered, advice_rect)
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif pygame.mouse.get_pos()[0] in range(retry_btn_pos[0], retry_btn_pos[0] + retry_btn_size[0]) and \
+                    pygame.mouse.get_pos()[1] in range(retry_btn_pos[1], retry_btn_pos[1] + retry_btn_size[1]):
+                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(retry_btn_pos, retry_btn_size))
+                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    beginning(board.cur_lvl_num)
+                    pygame.mixer.music.play()
+            else:
+                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(retry_btn_pos, retry_btn_size))
+                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
+            screen.blit(retry_text_rendered, (retry_btn_pos[0] + 20, retry_btn_pos[1] + 50))
+            # --------------
+            if pygame.mouse.get_pos()[0] in range(return_btn_pos[0], return_btn_pos[0] + return_btn_size[0]) and \
+                    pygame.mouse.get_pos()[1] in range(return_btn_pos[1], return_btn_pos[1] + return_btn_size[1]):
+                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(return_btn_pos, return_btn_size))
+                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    beginning()
+            else:
+                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(return_btn_pos, return_btn_size))
+                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
+            screen.blit(return_text_rendered, (return_btn_pos[0] + 20, return_btn_pos[1] + 50))
         pygame.display.flip()
 
 
@@ -215,6 +389,7 @@ class Board:
         self.cur_lvl_num = 0
         self.cur_lvl_map = []
         self.skeletons = []
+        self.traps = []
 
     # настройка внешнего вида
     def set_view(self, left, top, cell_size):
@@ -248,7 +423,6 @@ class Hero(pygame.sprite.Sprite):
         self.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (9 - pos[1])
         self.image = Hero.image_st
         self.animated = False
-        self.last_anim = 'y'
         self.near = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
     def move(self, ax, step):
@@ -258,7 +432,7 @@ class Hero(pygame.sprite.Sprite):
         self.moved = time.monotonic()
         if ax == "x":
             if (self.pos[0] + step in range(0, board.width)) and (
-                    board.cur_lvl_map[board.height - self.pos[1] - 1][self.pos[0] + step] in ('P', '-')):
+                    board.cur_lvl_map[board.height - self.pos[1] - 1][self.pos[0] + step] in ('-', 'T')):
                 self.direct = step
                 self.pos[0] += step
                 self.animation(1, ax)
@@ -266,14 +440,12 @@ class Hero(pygame.sprite.Sprite):
                 return
         else:
             if self.pos[1] + step in range(0, board.height) and (
-                    board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] in ('P', '-')):
+                    board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] in ('-', 'T')):
                 self.direct = step
                 self.pos[1] += step
                 self.animation(1, ax)
             else:
                 return
-        board.cur_lvl_map[9 - last_pos[1]][last_pos[0]] = '-'
-        board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'P'
 
     def animation(self, v, ax):
         if ax == 'x':
@@ -301,14 +473,13 @@ class Hero(pygame.sprite.Sprite):
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
 
-    def enemies_near(self):
-        n = 0
-        for i in range(4):
-            if 9 - self.pos[1] + self.near[i][1] in range(0, board.width) and self.pos[0] + self.near[i][0] in \
-                    range(0, board.height):
-                if board.cur_lvl_map[9 - self.pos[1] + self.near[i][1]][self.pos[0] + self.near[i][0]] == "S":
-                    n += 1
-        return n
+    def death(self):
+        if board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] == "S":
+            return True
+        if board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] == "T":
+            if board.traps[0].state:
+                return True
+        return False
 
 
 class Skeleton(pygame.sprite.Sprite):
@@ -351,7 +522,6 @@ class Skeleton(pygame.sprite.Sprite):
         elif dir == 'l':
             self.pos = self.pos[0] - 1, self.pos[1]
             self.animation(1, 'x')
-        board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'S'
 
     def animation(self, v, ax):
         if ax == 'x':
@@ -364,6 +534,7 @@ class Skeleton(pygame.sprite.Sprite):
                 self.rect.y += 14
                 self.image = self.image_st
                 self.animated = False
+                board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'S'
             self.rect.x += self.direct * cell_size // 2
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
@@ -375,6 +546,7 @@ class Skeleton(pygame.sprite.Sprite):
             else:
                 self.image = self.image_st
                 self.animated = False
+                board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'S'
             self.rect.y -= cell_size // 2 * self.direct
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
@@ -408,6 +580,30 @@ class Ground(pygame.sprite.Sprite):
         self.rect.x = board.left + board.cell_size * pos[1]
         self.rect.y = board.top + board.cell_size * pos[0]
         self.image = pygame.transform.scale(self.image, (100, 100))
+
+
+class Trap(pygame.sprite.Sprite):
+
+    def __init__(self, pos, *group, state=0):
+        super().__init__(*group)
+        self.image_st = load_image("trap.png")
+        self.image_st = pygame.transform.scale(self.image_st, (100, 100))
+        self.image_act = load_image("trap_act.png")
+        self.image_act = pygame.transform.scale(self.image_act, (100, 100))
+        self.image = self.image_st
+        self.rect = self.image.get_rect()
+        self.pos = pos
+        self.rect.x = board.left + board.cell_size * pos[1]
+        self.rect.y = board.top + board.cell_size * pos[0]
+        self.state = state
+        board.traps.append(self)
+
+    def update(self):
+        self.state = 1 - self.state
+        if self.state:
+            self.image = self.image_act
+        else:
+            self.image = self.image_st
 
 
 # Начало
