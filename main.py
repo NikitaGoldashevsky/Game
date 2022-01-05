@@ -8,6 +8,7 @@ BGCOLOR = (120, 40, 30)
 NETCOLOR = (40, 10, 5)
 
 pygame.init()
+
 user_screen = 1920, 1080
 size = width, height = user_screen[0], user_screen[1]
 screen = pygame.display.set_mode(size)
@@ -132,16 +133,23 @@ def beginning(level=0):
 
 
 def start_level():
-    # MUSIC
+    # MUSIC and SOUNDS
     pygame.mixer.music.load('data/track1.mp3')
     pygame.mixer.music.set_volume(0.4)
     pygame.mixer.music.play()
-    fail_sound = pygame.mixer.Sound('data/fail.mp3')
+    fail_sound = pygame.mixer.Sound('data/fail_menu.mp3')
+    heart_loss = pygame.mixer.Sound('data/record_scratch.wav')
 
     # TIMER
     timer = time.monotonic()
     beat = 0.576
     beat_add = 0.1
+    mot_mult = 1.3
+
+    # HEARTS
+    hero.hearts = 3
+    heart_image = load_image('heart.png')
+    heart_image = pygame.transform.scale(heart_image, (80, 80))
 
     # BG
     bg_image = load_image('bg 4 game1.jpg')
@@ -149,6 +157,8 @@ def start_level():
 
     bg_image_lighter = load_image('bg 4 game2.jpg')
     bg_image_lighter = pygame.transform.scale(bg_image_lighter, user_screen)
+
+    screen_image = bg_image
 
     # game cycle
     hero_moved = False
@@ -163,15 +173,15 @@ def start_level():
                 sk.update()
             traps.update()
         elif time.monotonic() > timer + beat_add:
-            screen.blit(bg_image, (0, 0))
+            screen_image = bg_image
         if time.monotonic() > timer + beat - beat_add:
-            screen.blit(bg_image_lighter, (0, 0))
-        if time.monotonic() - timer > beat_add * 1.5 and time.monotonic() - timer < beat / 2:
+            screen_image = bg_image_lighter
+        if beat / 2 > time.monotonic() - timer > beat_add * mot_mult:
             next_move = True
-        if time.monotonic() - timer > beat - beat_add * 1.5 and next_move:
+        if time.monotonic() - timer > beat - beat_add * mot_mult and next_move:
             hero_moved = False
             next_move = False
-        if pygame.mixer.music.get_pos() % 81000 > 80000:
+        if pygame.mixer.music.get_pos() % 80000 > 79000:
             pygame.mixer.music.rewind()
             timer = time.monotonic()
 
@@ -185,22 +195,28 @@ def start_level():
                     screen.blit(bg_image, (0, 0))
                     pause()
                     timer = time.monotonic() - dif
-                if not held and (
-                        time.monotonic() - timer < beat_add * 1.5 or time.monotonic() - timer > beat - beat_add * 1.5) \
-                        and not hero_moved:
-                    hero_moved = True
-                    if keys[pygame.K_UP] or keys[pygame.K_w]:
-                        hero.move('y', 1)
-                        held = True
-                    elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
-                        hero.move('y', -1)
-                        held = True
-                    elif keys[pygame.K_LEFT] or keys[pygame.K_a]:
-                        hero.move('x', -1)
-                        held = True
-                    elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-                        hero.move('x', 1)
-                        held = True
+                if any((keys[pygame.K_UP], keys[pygame.K_DOWN], keys[pygame.K_LEFT], keys[pygame.K_RIGHT],
+                        keys[pygame.K_w],
+                        keys[pygame.K_s], keys[pygame.K_a], keys[pygame.K_d])):
+                    if not held:
+                        if time.monotonic() - timer < beat_add * mot_mult or time.monotonic() - timer > beat - beat_add * mot_mult \
+                                and not hero_moved:
+                            hero_moved = True
+                            if keys[pygame.K_UP] or keys[pygame.K_w]:
+                                hero.move('y', 1)
+                                held = True
+                            elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
+                                hero.move('y', -1)
+                                held = True
+                            elif keys[pygame.K_LEFT] or keys[pygame.K_a]:
+                                hero.move('x', -1)
+                                held = True
+                            elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+                                hero.move('x', 1)
+                                held = True
+                        else:
+                            hero.hearts -= 1
+                            heart_loss.play()
             if event.type == pygame.KEYUP:
                 held = False
         if time.monotonic() - hero.moved > 0.15:
@@ -219,20 +235,22 @@ def start_level():
             fail_sound.play()
 
             hero.image = load_image('grave.png')
-            hero.image = pygame.transform.scale(hero.image, (100, 100))
-
+            hero.image = pygame.transform.scale(hero.image, (110, 110))
             board.render(screen)
             tiles.draw(screen)
             traps.draw(screen)
             characters.draw(screen)
             pygame.display.flip()
 
-            time.sleep(1.2)
+            time.sleep(1)
             end_screen()
+        screen.blit(screen_image, (0, 0))
         board.render(screen)
         tiles.draw(screen)
         traps.draw(screen)
         characters.draw(screen)
+        for i in range(hero.hearts):
+            screen.blit(heart_image, (user_screen[0] // 16 + i * 90, user_screen[1] // 12))
         pygame.display.flip()
 
 
@@ -364,6 +382,10 @@ def end_screen():
     screen.blit(return_text_rendered, (return_btn_pos[0] + 20, return_btn_pos[1] + 50))
     screen.blit(text_top_rendered, text_top_rect)
     screen.blit(advice_rendered, advice_rect)
+
+    fail_sound = pygame.mixer.Sound('data/fail.mp3')
+    fail_sound.set_volume(0.7)
+    fail_sound.play()
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -460,6 +482,7 @@ class Hero(pygame.sprite.Sprite):
         self.image = Hero.image_st
         self.animated = False
         self.mask = pygame.mask.from_surface(self.image)
+        self.hearts = 0
 
     def move(self, ax, step):
         last_pos = self.pos[0], self.pos[1]
@@ -508,6 +531,8 @@ class Hero(pygame.sprite.Sprite):
                 self.image = pygame.transform.flip(self.image, True, False)
 
     def death(self):
+        if self.hearts < 0:
+            return True
         if board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] == "S":
             return True
         if board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] == "T":
