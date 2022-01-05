@@ -44,6 +44,9 @@ def generate_level(level_map):
                 cur_path += 1
             elif board.cur_lvl_map[y][x] == 'T':
                 Trap((y, x), traps)
+            elif board.cur_lvl_map[y][x] == 'F':
+                Ground((y, x), tiles)
+                Fireball((y, x), traps)
             elif board.cur_lvl_map[y][x] == 'P':
                 Ground((y, x), tiles)
                 hero.pos = [x, 9 - y]
@@ -74,8 +77,10 @@ def main_menu():
     screen.blit(title_rendered, title_rect)
 
     pygame.mixer.music.load('data/menu music.mp3')
-    pygame.mixer.music.set_volume(30)
+    pygame.mixer.music.set_volume(0.5)
     pygame.mixer.music.play()
+    click_sound = pygame.mixer.Sound('data/click.mp3')
+    click_sound.set_volume(0.6)
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -89,7 +94,7 @@ def main_menu():
                 pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
                 screen.blit(button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pygame.mixer.Sound('data/click.mp3').play()
+                    click_sound.play()
                     board.cur_lvl_num = 1
                     return 'data/level 1.txt'
             else:
@@ -129,12 +134,13 @@ def beginning(level=0):
 def start_level():
     # MUSIC
     pygame.mixer.music.load('data/track1.mp3')
-    pygame.mixer.music.set_volume(30)
+    pygame.mixer.music.set_volume(0.4)
     pygame.mixer.music.play()
+    fail_sound = pygame.mixer.Sound('data/fail.mp3')
 
     # TIMER
     timer = time.monotonic()
-    beat = 0.58
+    beat = 0.576
     beat_add = 0.1
 
     # BG
@@ -144,6 +150,9 @@ def start_level():
     bg_image_lighter = load_image('bg 4 game2.jpg')
     bg_image_lighter = pygame.transform.scale(bg_image_lighter, user_screen)
 
+    # game cycle
+    hero_moved = False
+    next_move = True
     held = False
     running = True
     screen.blit(bg_image, (0, 0))
@@ -157,7 +166,11 @@ def start_level():
             screen.blit(bg_image, (0, 0))
         if time.monotonic() > timer + beat - beat_add:
             screen.blit(bg_image_lighter, (0, 0))
-
+        if time.monotonic() - timer > beat_add * 1.5 and time.monotonic() - timer < beat / 2:
+            next_move = True
+        if time.monotonic() - timer > beat - beat_add * 1.5 and next_move:
+            hero_moved = False
+            next_move = False
         if pygame.mixer.music.get_pos() % 81000 > 80000:
             pygame.mixer.music.rewind()
             timer = time.monotonic()
@@ -170,11 +183,12 @@ def start_level():
                 if keys[pygame.K_ESCAPE]:
                     dif = time.monotonic() - timer
                     screen.blit(bg_image, (0, 0))
-                    pygame.mixer.Sound('data/click.mp3').play()
                     pause()
                     timer = time.monotonic() - dif
                 if not held and (
-                        time.monotonic() > timer + beat - beat_add * 2 or time.monotonic() - beat_add * 2 < timer):
+                        time.monotonic() - timer < beat_add * 1.5 or time.monotonic() - timer > beat - beat_add * 1.5) \
+                        and not hero_moved:
+                    hero_moved = True
                     if keys[pygame.K_UP] or keys[pygame.K_w]:
                         hero.move('y', 1)
                         held = True
@@ -196,7 +210,24 @@ def start_level():
             for sk in board.skeletons:
                 if sk.animated:
                     sk.animation(0, sk.last_anim)
+        if time.monotonic() - timer > beat / 2:
+            for fb in board.fireballs:
+                if not fb.moved:
+                    fb.move()
         if hero.death():
+            pygame.mixer.music.stop()
+            fail_sound.play()
+
+            hero.image = load_image('grave.png')
+            hero.image = pygame.transform.scale(hero.image, (100, 100))
+
+            board.render(screen)
+            tiles.draw(screen)
+            traps.draw(screen)
+            characters.draw(screen)
+            pygame.display.flip()
+
+            time.sleep(1.2)
             end_screen()
         board.render(screen)
         tiles.draw(screen)
@@ -246,6 +277,8 @@ def pause():
     screen.blit(cont_text_rendered, (cont_btn_pos[0] + 20, cont_btn_pos[1] + 50))
     screen.blit(text_top_rendered, text_top_rect)
 
+    click_sound = pygame.mixer.Sound('data/click.mp3')
+    click_sound.set_volume(0.6)
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -255,7 +288,7 @@ def pause():
                 pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(retry_btn_pos, retry_btn_size))
                 pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pygame.mixer.Sound('data/click.mp3').play()
+                    click_sound.play()
                     beginning(board.cur_lvl_num)
             else:
                 pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(retry_btn_pos, retry_btn_size))
@@ -267,7 +300,7 @@ def pause():
                 pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(return_btn_pos, return_btn_size))
                 pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pygame.mixer.Sound('data/click.mp3').play()
+                    click_sound.play()
                     beginning()
             else:
                 pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(return_btn_pos, return_btn_size))
@@ -279,7 +312,7 @@ def pause():
                 pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(cont_btn_pos, cont_btn_size))
                 pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(cont_btn_pos, cont_btn_size), 8)
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pygame.mixer.Sound('data/click.mp3').play()
+                    click_sound.play()
                     pygame.mixer.music.unpause()
                     return
             else:
@@ -290,10 +323,9 @@ def pause():
 
 
 def end_screen():
-    pygame.mixer.music.pause()
     text_top = "Вы проиграли!"
     advice = random.choice(('Двигайтесь в одном ритме с музыкой', 'Избегайте столкновений с врагами',
-                            'Переходите через шипы тогда, когда они скрыты'))
+                            'Переходите через шипы тогда, когда они скрыты', 'Старайтесь не касаться огненных шаров'))
     retry_text = "Начать заново"
     retry_btn_pos = (520, 640)
     retry_btn_size = (340, 150)
@@ -305,6 +337,8 @@ def end_screen():
     screen.blit(fon, (0, 0))
     font = pygame.font.Font(None, 60)
     adv_font = pygame.font.Font(None, 52)
+    click_sound = pygame.mixer.Sound('data/click.mp3')
+    click_sound.set_volume(0.6)
 
     advice_rendered = adv_font.render(advice, True, pygame.Color('black'))
     text_top_rendered = font.render(text_top, True, pygame.Color('black'))
@@ -339,8 +373,8 @@ def end_screen():
                 pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(retry_btn_pos, retry_btn_size))
                 pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
                 if event.type == pygame.MOUSEBUTTONDOWN:
+                    click_sound.play()
                     beginning(board.cur_lvl_num)
-                    pygame.mixer.music.play()
             else:
                 pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(retry_btn_pos, retry_btn_size))
                 pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
@@ -351,6 +385,7 @@ def end_screen():
                 pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(return_btn_pos, return_btn_size))
                 pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
                 if event.type == pygame.MOUSEBUTTONDOWN:
+                    click_sound.play()
                     beginning()
             else:
                 pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(return_btn_pos, return_btn_size))
@@ -390,6 +425,7 @@ class Board:
         self.cur_lvl_map = []
         self.skeletons = []
         self.traps = []
+        self.fireballs = []
 
     # настройка внешнего вида
     def set_view(self, left, top, cell_size):
@@ -417,22 +453,20 @@ class Hero(pygame.sprite.Sprite):
         super().__init__(*group)
         self.pos = pos
         self.direct = direct
-        self.moved = 0
         self.rect = self.image_st.get_rect()
         self.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * pos[0]
         self.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (9 - pos[1])
+        self.moved = 0.0
         self.image = Hero.image_st
         self.animated = False
-        self.near = ((1, 0), (-1, 0), (0, 1), (0, -1))
+        self.mask = pygame.mask.from_surface(self.image)
 
     def move(self, ax, step):
         last_pos = self.pos[0], self.pos[1]
-        if time.monotonic() - self.moved < 0.4:
-            return
         self.moved = time.monotonic()
         if ax == "x":
             if (self.pos[0] + step in range(0, board.width)) and (
-                    board.cur_lvl_map[board.height - self.pos[1] - 1][self.pos[0] + step] in ('-', 'T')):
+                    board.cur_lvl_map[board.height - self.pos[1] - 1][self.pos[0] + step] in ('-', 'T', 'F')):
                 self.direct = step
                 self.pos[0] += step
                 self.animation(1, ax)
@@ -440,7 +474,7 @@ class Hero(pygame.sprite.Sprite):
                 return
         else:
             if self.pos[1] + step in range(0, board.height) and (
-                    board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] in ('-', 'T')):
+                    board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] in ('-', 'T', 'F')):
                 self.direct = step
                 self.pos[1] += step
                 self.animation(1, ax)
@@ -477,7 +511,12 @@ class Hero(pygame.sprite.Sprite):
         if board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] == "S":
             return True
         if board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] == "T":
-            if board.traps[0].state:
+            if board.traps[0].state == 3:
+                return True
+        for elem in board.fireballs:
+            if pygame.sprite.collide_mask(self, elem) and 9 - elem.pos[0] == self.pos[1]:
+                print(elem.pos, self.pos)
+                print(elem.pos[0], self.pos[1])
                 return True
         return False
 
@@ -599,11 +638,40 @@ class Trap(pygame.sprite.Sprite):
         board.traps.append(self)
 
     def update(self):
-        self.state = 1 - self.state
-        if self.state:
+        self.state = (self.state + 1) % 4
+        if self.state == 3:
             self.image = self.image_act
         else:
             self.image = self.image_st
+
+
+class Fireball(pygame.sprite.Sprite):
+
+    def __init__(self, pos, *group):
+        super().__init__(*group)
+        self.image = load_image("fireball.png")
+        self.image = pygame.transform.scale(self.image, (100, 100))
+        self.image = pygame.transform.flip(self.image, True, False)
+        self.pos = pos
+        self.rect = self.image.get_rect()
+        self.rect.x = board.left + board.cell_size * pos[1]
+        self.rect.y = board.top + board.cell_size * pos[0]
+        self.direct = 1
+        self.moved = True
+        self.mask = pygame.mask.from_surface(self.image)
+        board.fireballs.append(self)
+
+    def update(self):
+        if self.pos[1] + self.direct not in range(board.width):
+            self.direct *= -1
+            self.image = pygame.transform.flip(self.image, True, False)
+        self.pos = self.pos[0], self.pos[1] + self.direct
+        self.rect.x += board.cell_size * self.direct // 2
+        self.moved = False
+
+    def move(self):
+        self.rect.x += board.cell_size * self.direct // 2
+        self.moved = True
 
 
 # Начало
