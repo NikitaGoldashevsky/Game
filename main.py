@@ -169,7 +169,7 @@ def start_level():
 
     # TIMER
     timer = time.monotonic()
-    beat = 0.576
+    beat = 0.584
     beat_add = 0.1
     mot_mult = 1.4
 
@@ -278,7 +278,7 @@ def start_level():
             pygame.display.flip()
 
             time.sleep(1)
-            end_screen()
+            end_screen('loss')
         screen.blit(screen_image, (0, 0))
         board.render(screen)
         tiles.draw(screen)
@@ -316,7 +316,8 @@ def start_level():
             board.door.image = pygame.transform.scale(board.door.image, (100, 100))
         characters.draw(screen)
         if hero.pos[0] == board.exit_door.pos[1] and 9 - hero.pos[1] == board.exit_door.pos[0]:
-            level_completed()
+            pygame.mixer.music.stop()
+            end_screen('win')
         for i in range(hero.hearts):
             screen.blit(heart_image, (user_screen[0] // 16 + i * 90, user_screen[1] // 12))
         screen.blit(counter_font.render(str(board.moves_counter), True, pygame.Color('white')), counter_rect)
@@ -409,10 +410,12 @@ def pause():
         pygame.display.flip()
 
 
-def end_screen():
-    text_top = "Вы проиграли!"
-    advice = random.choice(('Двигайтесь в одном ритме с музыкой', 'Избегайте столкновений с врагами',
-                            'Переходите через шипы тогда, когда они скрыты', 'Старайтесь не касаться огненных шаров'))
+def end_screen(state):
+    if state == 'loss':
+        text_top = "Вы проиграли"
+    else:
+        text_top = "Вы выиграли!"
+        pygame.mixer.Sound('data/completed_sound.wav').play()
     retry_text = "Начать заново"
     retry_btn_pos = (520, 640)
     retry_btn_size = (340, 150)
@@ -427,10 +430,9 @@ def end_screen():
     click_sound = pygame.mixer.Sound('data/click.wav')
     click_sound.set_volume(0.6)
 
-    advice_rendered = adv_font.render(advice, True, pygame.Color('black'))
     text_top_rendered = font.render(text_top, True, pygame.Color('black'))
     text_top_rect = (user_screen[0] - text_top_rendered.get_rect()[2]) // 2, user_screen[1] // 4 + 110
-    advice_rect = (user_screen[0] - advice_rendered.get_rect()[2]) // 2, text_top_rect[1] + 110
+
     retry_text_rendered = font.render(retry_text, True, pygame.Color('black'))
     return_text_rendered = font.render(return_text, True, pygame.Color('black'))
     screen.blit(text_top_rendered, text_top_rect)
@@ -450,8 +452,18 @@ def end_screen():
     screen.blit(retry_text_rendered, (retry_btn_pos[0] + 20, retry_btn_pos[1] + 50))
     screen.blit(return_text_rendered, (return_btn_pos[0] + 20, return_btn_pos[1] + 50))
     screen.blit(text_top_rendered, text_top_rect)
-    screen.blit(advice_rendered, advice_rect)
-
+    if state == 'loss':
+        advice = random.choice(('Двигайтесь в одном ритме с музыкой', 'Избегайте столкновений с врагами',
+                                'Переходите через шипы тогда, когда они скрыты',
+                                'Старайтесь не касаться огненных шаров'))
+        advice_rendered = adv_font.render(advice, True, pygame.Color('black'))
+        advice_rect = (user_screen[0] - advice_rendered.get_rect()[2]) // 2, text_top_rect[1] + 110
+        screen.blit(advice_rendered, advice_rect)
+    else:
+        counter_res = f'Игровых ходов: {str(board.moves_counter)}'
+        counter_res_rendered = font.render(counter_res, True, pygame.Color('black'))
+        counter_res_rect = (user_screen[0] - counter_res_rendered.get_rect()[2]) // 2, text_top_rect[1] + 110
+        screen.blit(counter_res_rendered, counter_res_rect)
     fail_sound = pygame.mixer.Sound('data/fail.wav')
     fail_sound.set_volume(0.7)
     fail_sound.play()
@@ -470,7 +482,6 @@ def end_screen():
                 pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(retry_btn_pos, retry_btn_size))
                 pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(retry_btn_pos, retry_btn_size), 8)
             screen.blit(retry_text_rendered, (retry_btn_pos[0] + 20, retry_btn_pos[1] + 50))
-            # --------------
             if pygame.mouse.get_pos()[0] in range(return_btn_pos[0], return_btn_pos[0] + return_btn_size[0]) and \
                     pygame.mouse.get_pos()[1] in range(return_btn_pos[1], return_btn_pos[1] + return_btn_size[1]):
                 pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(return_btn_pos, return_btn_size))
@@ -483,10 +494,6 @@ def end_screen():
                 pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(return_btn_pos, return_btn_size), 8)
             screen.blit(return_text_rendered, (return_btn_pos[0] + 20, return_btn_pos[1] + 50))
         pygame.display.flip()
-
-
-def level_completed():
-    terminate()
 
 
 def load_image(name, colorkey=None):
