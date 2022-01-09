@@ -8,7 +8,7 @@ F---------
 ----WWDWWW
 ----W-----
 -P--W--S--
-----W-----
+----W--B--
 uullddrr
 uudddu
 rrll
