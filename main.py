@@ -48,12 +48,29 @@ def generate_level(level_map):
             elif board.cur_lvl_map[y][x] == 'F':
                 Ground((y, x), tiles)
                 Fireball((y, x), traps)
+            elif board.cur_lvl_map[y][x] == 'K':
+                board.key_ex = True
+                Ground((y, x), tiles)
+                key.rect.x = board.left + board.cell_size * x - board.cell_size / 8
+                key.rect.y = board.top + board.cell_size * y - board.cell_size / 7
+                key.pos = [x, y]
+            elif board.cur_lvl_map[y][x] == 'D':
+                board.door = Door((y, x), doors)
+            elif board.cur_lvl_map[y][x] == 'B':
+                Ground((y, x), tiles)
+                hero.blade = Blade((x, y))
+            elif board.cur_lvl_map[y][x] == 'E':
+                board.exit_door = ExitDoor((y, x), doors)
             elif board.cur_lvl_map[y][x] == 'P':
                 Ground((y, x), tiles)
                 hero.pos = [x, 9 - y]
                 hero.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * hero.pos[0]
                 hero.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (hero.pos[1] + 1)
                 board.cur_lvl_map[y][x] = '-'
+            else:
+                print('Ошибка при чтении карты уровня',
+                      str(board.cur_lvl_num) + f': неопознанный символ \"{level_map[y][x]}\"')
+                terminate()
 
 
 def main_menu():
@@ -80,7 +97,7 @@ def main_menu():
     pygame.mixer.music.load('data/menu music.mp3')
     pygame.mixer.music.set_volume(0.5)
     pygame.mixer.music.play()
-    click_sound = pygame.mixer.Sound('data/click.mp3')
+    click_sound = pygame.mixer.Sound('data/click.wav')
     click_sound.set_volume(0.6)
     while True:
         for event in pygame.event.get():
@@ -106,12 +123,13 @@ def main_menu():
 
 
 def beginning(level=0):
-    global board, tiles, characters, cell_size, hero, traps
+    global board, tiles, characters, cell_size, hero, traps, key, doors
 
     # SPRITES
     tiles = pygame.sprite.Group()
     characters = pygame.sprite.Group()
     traps = pygame.sprite.Group()
+    doors = pygame.sprite.Group()
 
     # BOARD
     board = Board(10, 10)
@@ -122,6 +140,9 @@ def beginning(level=0):
     # HERO
     hero = Hero((0, 0))
     characters.add(hero)
+
+    # KEY
+    key = Key((0, 0))
 
     # ЗАГРУЗКА УРОВНЯ
     if not level:
@@ -137,14 +158,20 @@ def start_level():
     pygame.mixer.music.load('data/track1.mp3')
     pygame.mixer.music.set_volume(0.4)
     pygame.mixer.music.play()
-    fail_sound = pygame.mixer.Sound('data/fail_menu.mp3')
+    fail_sound = pygame.mixer.Sound('data/fail_menu.wav')
     heart_loss = pygame.mixer.Sound('data/record_scratch.wav')
+    take_sound = pygame.mixer.Sound('data/take_sound.wav')
+    start_sound = pygame.mixer.Sound('data/start_sound.wav')
+    start_sound.set_volume(0.8)
+    take_sound.set_volume(0.2)
+    counter_font = pygame.font.Font(None, 100)
+    counter_rect = user_screen[0] // 10 * 8.8, user_screen[1] // 7
 
     # TIMER
     timer = time.monotonic()
     beat = 0.576
     beat_add = 0.1
-    mot_mult = 1.3
+    mot_mult = 1.4
 
     # HEARTS
     hero.hearts = 3
@@ -157,7 +184,6 @@ def start_level():
 
     bg_image_lighter = load_image('bg 4 game2.jpg')
     bg_image_lighter = pygame.transform.scale(bg_image_lighter, user_screen)
-
     screen_image = bg_image
 
     # game cycle
@@ -166,12 +192,17 @@ def start_level():
     held = False
     running = True
     screen.blit(bg_image, (0, 0))
+    start_sound.play()
     while running:
         if time.monotonic() > timer + beat:
+            board.moves_counter += 1
             timer = time.monotonic()
             for sk in board.skeletons:
                 sk.update()
             traps.update()
+            key.animate()
+            if hero.blade:
+                hero.blade.animate()
         elif time.monotonic() > timer + beat_add:
             screen_image = bg_image
         if time.monotonic() > timer + beat - beat_add:
@@ -181,7 +212,7 @@ def start_level():
         if time.monotonic() - timer > beat - beat_add * mot_mult and next_move:
             hero_moved = False
             next_move = False
-        if pygame.mixer.music.get_pos() % 80000 > 79000:
+        if pygame.mixer.music.get_pos() % 79800 > 79500:
             pygame.mixer.music.rewind()
             timer = time.monotonic()
 
@@ -240,6 +271,10 @@ def start_level():
             tiles.draw(screen)
             traps.draw(screen)
             characters.draw(screen)
+            if not hero.has_blade and hero.blade:
+                screen.blit(hero.blade.image, hero.blade.rect)
+            if board.key_ex and not hero.has_key:
+                screen.blit(key.image, key.rect)
             pygame.display.flip()
 
             time.sleep(1)
@@ -248,9 +283,43 @@ def start_level():
         board.render(screen)
         tiles.draw(screen)
         traps.draw(screen)
+        doors.draw(screen)
+        if hero.blade:
+            if not hero.has_blade:
+                screen.blit(hero.blade.image, hero.blade.rect)
+                if hero.pos[0] == hero.blade.pos[0] and hero.pos[1] == 9 - hero.blade.pos[1]:
+                    hero.has_blade = True
+                    take_sound.play()
+                    hero.blade.image = pygame.transform.scale(hero.blade.image, (170, 140))
+            else:
+                screen.blit(hero.blade.image, (user_screen[0] // 16 + 40, user_screen[1] // 3))
+                if board.cur_lvl_map[9 - hero.pos[1]][hero.pos[0]] == 'S':
+                    board.cur_lvl_map[9 - hero.pos[1]][hero.pos[0]] = '-'
+                    for sk in board.skeletons:
+                        if sk.pos[0] == hero.pos[0] and sk.pos[1] == hero.pos[1]:
+                            sk.die()
+        if board.key_ex:
+            if not hero.has_key:
+                screen.blit(key.image, key.rect)
+                if hero.pos[0] == key.pos[0] and hero.pos[1] == 9 - key.pos[1]:
+                    hero.has_key = True
+                    take_sound.play()
+                    key.image = pygame.transform.scale(key.image, (180, 180))
+            else:
+                if not board.door.opened:
+                    screen.blit(key.image, (user_screen[0] // 16 + 40, user_screen[1] // 6))
+        else:
+            print(board.cur_lvl_map)
+        if hero.has_key and hero.door_near():
+            board.door.opened = True
+            board.door.image = load_image('door_opened.jpg')
+            board.door.image = pygame.transform.scale(board.door.image, (100, 100))
         characters.draw(screen)
+        if hero.pos[0] == board.exit_door.pos[1] and 9 - hero.pos[1] == board.exit_door.pos[0]:
+            level_completed()
         for i in range(hero.hearts):
             screen.blit(heart_image, (user_screen[0] // 16 + i * 90, user_screen[1] // 12))
+        screen.blit(counter_font.render(str(board.moves_counter), True, pygame.Color('white')), counter_rect)
         pygame.display.flip()
 
 
@@ -295,7 +364,7 @@ def pause():
     screen.blit(cont_text_rendered, (cont_btn_pos[0] + 20, cont_btn_pos[1] + 50))
     screen.blit(text_top_rendered, text_top_rect)
 
-    click_sound = pygame.mixer.Sound('data/click.mp3')
+    click_sound = pygame.mixer.Sound('data/click.wav')
     click_sound.set_volume(0.6)
     while True:
         for event in pygame.event.get():
@@ -355,7 +424,7 @@ def end_screen():
     screen.blit(fon, (0, 0))
     font = pygame.font.Font(None, 60)
     adv_font = pygame.font.Font(None, 52)
-    click_sound = pygame.mixer.Sound('data/click.mp3')
+    click_sound = pygame.mixer.Sound('data/click.wav')
     click_sound.set_volume(0.6)
 
     advice_rendered = adv_font.render(advice, True, pygame.Color('black'))
@@ -366,7 +435,7 @@ def end_screen():
     return_text_rendered = font.render(return_text, True, pygame.Color('black'))
     screen.blit(text_top_rendered, text_top_rect)
 
-    pygame.draw.rect(screen, (100, 30, 20),
+    pygame.draw.rect(screen, (100, 40, 30),
                      pygame.Rect(user_screen[0] // 4, user_screen[1] // 4, user_screen[0] // 2,
                                  user_screen[1] // 2))
     pygame.draw.rect(screen, (30, 30, 20),
@@ -383,7 +452,7 @@ def end_screen():
     screen.blit(text_top_rendered, text_top_rect)
     screen.blit(advice_rendered, advice_rect)
 
-    fail_sound = pygame.mixer.Sound('data/fail.mp3')
+    fail_sound = pygame.mixer.Sound('data/fail.wav')
     fail_sound.set_volume(0.7)
     fail_sound.play()
     while True:
@@ -416,6 +485,10 @@ def end_screen():
         pygame.display.flip()
 
 
+def level_completed():
+    terminate()
+
+
 def load_image(name, colorkey=None):
     fullname = os.path.join('data', name)
     if not os.path.isfile(fullname):
@@ -438,8 +511,6 @@ class Board:
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.board = [[0] * width for _ in range(height)]
-        # значения по умолчанию
         self.left = 10
         self.top = 10
         self.cell_size = 30
@@ -448,12 +519,16 @@ class Board:
         self.skeletons = []
         self.traps = []
         self.fireballs = []
+        self.door = None
+        self.moves_counter = 0
+        self.exit_door = None
+        self.key_ex = False
 
     # настройка внешнего вида
-    def set_view(self, left, top, cell_size):
+    def set_view(self, left, top, cells_size):
         self.left = left
         self.top = top
-        self.cell_size = cell_size
+        self.cell_size = cells_size
 
     def render(self, screen):
         for i in (0, self.width):
@@ -462,6 +537,39 @@ class Board:
         for i in (0, self.height):
             pygame.draw.line(screen, NETCOLOR, (self.left, self.top + self.cell_size * i),
                              (self.left + self.cell_size * self.width, self.top + self.cell_size * i), 14)
+
+
+class Door(pygame.sprite.Sprite):
+    image = load_image("door.jpg")
+    image = pygame.transform.scale(image, (100, 100))
+
+    def __init__(self, pos, *group):
+        super().__init__(*group)
+        self.pos = pos
+        self.image = Door.image
+        self.rect = self.image.get_rect()
+        self.rect.x = board.left + board.cell_size * pos[1]
+        self.rect.y = board.top + board.cell_size * pos[0]
+        self.opened = False
+
+
+class Key(pygame.sprite.Sprite):
+    image = load_image("key.png")
+    image = pygame.transform.scale(image, (120, 120))
+
+    def __init__(self, pos):
+        super().__init__()
+        self.pos = pos
+        self.image = Key.image
+        self.rect = self.image.get_rect()
+        self.anim = 0
+
+    def animate(self):
+        if self.anim:
+            self.rect.y -= 10
+        else:
+            self.rect.y += 10
+        self.anim = (self.anim + 1) % 2
 
 
 class Hero(pygame.sprite.Sprite):
@@ -483,13 +591,18 @@ class Hero(pygame.sprite.Sprite):
         self.animated = False
         self.mask = pygame.mask.from_surface(self.image)
         self.hearts = 0
+        self.has_key = False
+        self.blade = None
+        self.has_blade = False
+        self.last_anim = ''
 
     def move(self, ax, step):
-        last_pos = self.pos[0], self.pos[1]
         self.moved = time.monotonic()
         if ax == "x":
             if (self.pos[0] + step in range(0, board.width)) and (
-                    board.cur_lvl_map[board.height - self.pos[1] - 1][self.pos[0] + step] in ('-', 'T', 'F')):
+                    board.cur_lvl_map[board.height - self.pos[1] - 1][self.pos[0] + step] not in ('W', 'D') or
+                    len(doors) and board.cur_lvl_map[board.height - self.pos[1] - 1][
+                        self.pos[0] + step] == 'D' and board.door.opened):
                 self.direct = step
                 self.pos[0] += step
                 self.animation(1, ax)
@@ -497,7 +610,9 @@ class Hero(pygame.sprite.Sprite):
                 return
         else:
             if self.pos[1] + step in range(0, board.height) and (
-                    board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] in ('-', 'T', 'F')):
+                    board.cur_lvl_map[board.height - self.pos[1] - 1 - step][self.pos[0]] not in ('W', 'D') or
+                    len(doors) and board.cur_lvl_map[board.height - self.pos[1] - 1 - step][
+                        self.pos[0]] == 'D' and board.door.opened):
                 self.direct = step
                 self.pos[1] += step
                 self.animation(1, ax)
@@ -534,16 +649,33 @@ class Hero(pygame.sprite.Sprite):
         if self.hearts < 0:
             return True
         if board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] == "S":
-            return True
+            if not self.has_blade:
+                return True
         if board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] == "T":
             if board.traps[0].state == 3:
                 return True
         for elem in board.fireballs:
             if pygame.sprite.collide_mask(self, elem) and 9 - elem.pos[0] == self.pos[1]:
-                print(elem.pos, self.pos)
-                print(elem.pos[0], self.pos[1])
                 return True
         return False
+
+    def door_near(self):
+        for i in ((0, 1), (1, 0), (0, -1), (-1, 0)):
+            if self.pos[0] + i[0] in range(board.width) and 9 - self.pos[1] + i[1] in range(board.height):
+                if board.cur_lvl_map[9 - self.pos[1] + i[1]][self.pos[0] + i[0]] == 'D':
+                    return True
+        return False
+
+
+class ExitDoor(pygame.sprite.Sprite):
+    def __init__(self, pos, *group):
+        super().__init__(*group)
+        self.pos = pos
+        self.image = load_image('exit.png')
+        self.image = pygame.transform.scale(self.image, (100, 100))
+        self.rect = self.image.get_rect()
+        self.rect.x = board.left + board.cell_size * pos[1]
+        self.rect.y = board.top + board.cell_size * pos[0]
 
 
 class Skeleton(pygame.sprite.Sprite):
@@ -563,27 +695,28 @@ class Skeleton(pygame.sprite.Sprite):
         self.path_len = len(path)
         board.skeletons.append(self)
         self.animated = False
+        self.last_anim = ''
 
     def update(self):
         self.path = self.path[1:] + self.path[0]
         self.move(self.path[0])
 
-    def move(self, dir):
+    def move(self, direct):
         board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = '-'
-        if self.direct == 1 and dir == 'l' or self.direct == -1 and dir == 'r' or self.direct == 1 and dir == 'd' \
-                or self.direct == -1 and dir == 'u':
+        if self.direct == 1 and direct == 'l' or self.direct == -1 and direct == 'r' or self.direct == 1 and \
+                direct == 'd' or self.direct == -1 and direct == 'u':
             self.direct *= -1
             self.image = pygame.transform.flip(self.image, True, False)
-        if dir == 'u':
+        if direct == 'u':
             self.pos = self.pos[0], self.pos[1] + 1
             self.animation(1, 'y')
-        elif dir == 'd':
+        elif direct == 'd':
             self.pos = self.pos[0], self.pos[1] - 1
             self.animation(1, 'y')
-        elif dir == 'r':
+        elif direct == 'r':
             self.pos = self.pos[0] + 1, self.pos[1]
             self.animation(1, 'x')
-        elif dir == 'l':
+        elif direct == 'l':
             self.pos = self.pos[0] - 1, self.pos[1]
             self.animation(1, 'x')
 
@@ -615,6 +748,9 @@ class Skeleton(pygame.sprite.Sprite):
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
 
+    def die(self):
+        self.kill()
+
 
 class Wall(pygame.sprite.Sprite):
     image = load_image("wall.jpg")
@@ -644,6 +780,26 @@ class Ground(pygame.sprite.Sprite):
         self.rect.x = board.left + board.cell_size * pos[1]
         self.rect.y = board.top + board.cell_size * pos[0]
         self.image = pygame.transform.scale(self.image, (100, 100))
+
+
+class Blade(pygame.sprite.Sprite):
+
+    def __init__(self, pos):
+        super().__init__()
+        self.pos = pos
+        self.image = load_image("sword wo bg.png")
+        self.image = pygame.transform.scale(self.image, (100, 90))
+        self.rect = self.image.get_rect()
+        self.rect.x = board.left + board.cell_size * pos[0]
+        self.rect.y = board.top + board.cell_size * pos[1]
+        self.anim = 0
+
+    def animate(self):
+        if self.anim:
+            self.rect.y -= 10
+        else:
+            self.rect.y += 10
+        self.anim = (self.anim + 1) % 2
 
 
 class Trap(pygame.sprite.Sprite):
