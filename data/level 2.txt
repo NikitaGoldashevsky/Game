@@ -1,0 +1,20 @@
+10 0.593
+W-P-WW-WWW
+W----F---W
+W--WWWWWDW
+WTTWBTW-SW
+W-SWTSWT-W
+WS-W--W-SW
+WTTWSTWS-W
+W-----S--W
+W-K---S-EW
+WWWWWWWWWW
+rl
+rl
+udlr
+lr
+du
+du
+lr
+lr
+lr

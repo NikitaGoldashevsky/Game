@@ -26,8 +26,9 @@ def load_level(filename):
 
 
 def generate_level(level_map):
-    map_len_y = int(level_map.split()[0])
-    level_map = level_map.split()[1:]
+    map_len_y = int(level_map.split('\n')[0].split()[0])
+    board.cur_lvl_beat = float(level_map.split('\n')[0].split()[1])
+    level_map = level_map.split('\n')[1:]
     board.cur_lvl_map = level_map
     for i in range(map_len_y):
         level_map[i] = list(level_map[i])
@@ -64,8 +65,8 @@ def generate_level(level_map):
             elif board.cur_lvl_map[y][x] == 'P':
                 Ground((y, x), tiles)
                 hero.pos = [x, 9 - y]
-                hero.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * hero.pos[0]
-                hero.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (hero.pos[1] + 1)
+                hero.rect.x = width / 2 - board.cell_size * (board.width / 2) + board.cell_size * hero.pos[0]
+                hero.rect.y = height / 2 + board.cell_size * (board.height / 2) - board.cell_size * (hero.pos[1] + 1)
                 board.cur_lvl_map[y][x] = '-'
             else:
                 print('Ошибка при чтении карты уровня',
@@ -74,24 +75,32 @@ def generate_level(level_map):
 
 
 def main_menu():
-    title_text = "Название"
+    title_text = "Ковбой против скелетов"
     level_texts = ["1 УРОВЕНЬ", "2 УРОВЕНЬ", "3 УРОВЕНЬ"]
-    level1_btn_pos = (160, 380)
-    level1_btn_size = (300, 100)
+    font = pygame.font.Font(None, 65)
+
+    level1_btn_size = level2_btn_size = level3_btn_size = (320, 110)
+
+    level1_btn_pos = ((user_screen[0] - level1_btn_size[0]) // 2, 380)
+    level1_button_rendered = font.render(level_texts[0], True, pygame.Color('black'))
+
+    level2_btn_pos = ((user_screen[0] - level2_btn_size[0]) // 2, 540)
+    level2_button_rendered = font.render(level_texts[1], True, pygame.Color('black'))
+
+    level3_btn_pos = ((user_screen[0] - level3_btn_size[0]) // 2, 700)
+    level3_button_rendered = font.render(level_texts[2], True, pygame.Color('black'))
 
     fon = pygame.transform.scale(load_image('bg 4 menu.jpg'), user_screen)
     screen.blit(fon, (0, 0))
-    font = pygame.font.Font(None, 60)
-
-    # кнопка 1 уровня
     pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level1_btn_pos, level1_btn_size))
     pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
-    # её текст
-    button_rendered = font.render(level_texts[0], True, pygame.Color('black'))
+    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level2_btn_pos, level2_btn_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level2_btn_pos, level2_btn_size), 8)
+    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level3_btn_pos, level3_btn_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level3_btn_pos, level3_btn_size), 8)
 
-    # название
     title_rendered = font.render(title_text, True, pygame.Color('white'))
-    title_rect = 180, 200
+    title_rect = (user_screen[0] - title_rendered.get_rect()[2]) / 2, user_screen[0] // 8
     screen.blit(title_rendered, title_rect)
 
     pygame.mixer.music.load('data/menu music.mp3')
@@ -110,7 +119,7 @@ def main_menu():
                     pygame.mouse.get_pos()[1] in range(level1_btn_pos[1], level1_btn_pos[1] + level1_btn_size[1]):
                 pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level1_btn_pos, level1_btn_size))
                 pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
-                screen.blit(button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
+                screen.blit(level1_button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     click_sound.play()
                     board.cur_lvl_num = 1
@@ -118,12 +127,38 @@ def main_menu():
             else:
                 pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level1_btn_pos, level1_btn_size))
                 pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
-                screen.blit(button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
+                screen.blit(level1_button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
+            if pygame.mouse.get_pos()[0] in range(level2_btn_pos[0], level2_btn_pos[0] + level2_btn_size[0]) and \
+                    pygame.mouse.get_pos()[1] in range(level2_btn_pos[1], level2_btn_pos[1] + level2_btn_size[1]):
+                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level2_btn_pos, level2_btn_size))
+                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level2_btn_pos, level2_btn_size), 8)
+                screen.blit(level2_button_rendered, (level2_btn_pos[0] + 30, level2_btn_pos[1] + 30))
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    click_sound.play()
+                    board.cur_lvl_num = 2
+                    return 'data/level 2.txt'
+            else:
+                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level2_btn_pos, level2_btn_size))
+                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level2_btn_pos, level2_btn_size), 8)
+                screen.blit(level2_button_rendered, (level2_btn_pos[0] + 30, level2_btn_pos[1] + 30))
+            if pygame.mouse.get_pos()[0] in range(level3_btn_pos[0], level3_btn_pos[0] + level3_btn_size[0]) and \
+                    pygame.mouse.get_pos()[1] in range(level3_btn_pos[1], level3_btn_pos[1] + level3_btn_size[1]):
+                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level3_btn_pos, level3_btn_size))
+                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level3_btn_pos, level3_btn_size), 8)
+                screen.blit(level3_button_rendered, (level3_btn_pos[0] + 30, level3_btn_pos[1] + 30))
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    click_sound.play()
+                    board.cur_lvl_num = 3
+                    return 'data/level 3.txt'
+            else:
+                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level3_btn_pos, level3_btn_size))
+                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level3_btn_pos, level3_btn_size), 8)
+                screen.blit(level3_button_rendered, (level3_btn_pos[0] + 30, level3_btn_pos[1] + 30))
         pygame.display.flip()
 
 
 def beginning(level=0):
-    global board, tiles, characters, cell_size, hero, traps, key, doors
+    global board, tiles, characters, hero, traps, key, doors
 
     # SPRITES
     tiles = pygame.sprite.Group()
@@ -155,13 +190,14 @@ def beginning(level=0):
 
 def start_level():
     # MUSIC and SOUNDS
-    pygame.mixer.music.load('data/track1.mp3')
+    pygame.mixer.music.load(f'data/track {board.cur_lvl_num}.mp3')
     pygame.mixer.music.set_volume(0.4)
     pygame.mixer.music.play()
     fail_sound = pygame.mixer.Sound('data/fail_menu.wav')
     heart_loss = pygame.mixer.Sound('data/record_scratch.wav')
     take_sound = pygame.mixer.Sound('data/take_sound.wav')
     start_sound = pygame.mixer.Sound('data/start_sound.wav')
+    lenghts = {1: (79700, 79600), 2: (66900, 66800), 3: (38300, 38200)}
     start_sound.set_volume(0.8)
     take_sound.set_volume(0.2)
     counter_font = pygame.font.Font(None, 100)
@@ -169,9 +205,9 @@ def start_level():
 
     # TIMER
     timer = time.monotonic()
-    beat = 0.584
+    beat = board.cur_lvl_beat
     beat_add = 0.1
-    mot_mult = 1.4
+    mot_mult = 1.3
 
     # HEARTS
     hero.hearts = 3
@@ -212,10 +248,9 @@ def start_level():
         if time.monotonic() - timer > beat - beat_add * mot_mult and next_move:
             hero_moved = False
             next_move = False
-        if pygame.mixer.music.get_pos() % 79800 > 79500:
+        if pygame.mixer.music.get_pos() % lenghts[board.cur_lvl_num][0] > lenghts[board.cur_lvl_num][1]:
             pygame.mixer.music.rewind()
             timer = time.monotonic()
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -230,7 +265,8 @@ def start_level():
                         keys[pygame.K_w],
                         keys[pygame.K_s], keys[pygame.K_a], keys[pygame.K_d])):
                     if not held:
-                        if time.monotonic() - timer < beat_add * mot_mult or time.monotonic() - timer > beat - beat_add * mot_mult \
+                        if time.monotonic() - timer < beat_add * mot_mult or time.monotonic() - timer > \
+                                beat - beat_add * mot_mult \
                                 and not hero_moved:
                             hero_moved = True
                             if keys[pygame.K_UP] or keys[pygame.K_w]:
@@ -455,7 +491,8 @@ def end_screen(state):
     if state == 'loss':
         advice = random.choice(('Двигайтесь в одном ритме с музыкой', 'Избегайте столкновений с врагами',
                                 'Переходите через шипы тогда, когда они скрыты',
-                                'Старайтесь не касаться огненных шаров'))
+                                'Старайтесь не касаться огненных шаров', 'С помощью меча вы можете победить врагов',
+                                'Двери не открыть без ключа'))
         advice_rendered = adv_font.render(advice, True, pygame.Color('black'))
         advice_rect = (user_screen[0] - advice_rendered.get_rect()[2]) // 2, text_top_rect[1] + 110
         screen.blit(advice_rendered, advice_rect)
@@ -530,6 +567,7 @@ class Board:
         self.moves_counter = 0
         self.exit_door = None
         self.key_ex = False
+        self.cur_lvl_beat = 0.0
 
     # настройка внешнего вида
     def set_view(self, left, top, cells_size):
@@ -591,8 +629,8 @@ class Hero(pygame.sprite.Sprite):
         self.pos = pos
         self.direct = direct
         self.rect = self.image_st.get_rect()
-        self.rect.x = width / 2 - cell_size * (board.width / 2) + cell_size * pos[0]
-        self.rect.y = height / 2 + cell_size * (board.height / 2) - cell_size * (9 - pos[1])
+        self.rect.x = width / 2 - board.cell_size * (board.width / 2) + board.cell_size * pos[0]
+        self.rect.y = height / 2 + board.cell_size * (board.height / 2) - board.cell_size * (9 - pos[1])
         self.moved = 0.0
         self.image = Hero.image_st
         self.animated = False
@@ -637,7 +675,7 @@ class Hero(pygame.sprite.Sprite):
                 self.rect.y += 25
                 self.image = Hero.image_st
                 self.animated = False
-            self.rect.x += self.direct * cell_size // 2
+            self.rect.x += self.direct * board.cell_size // 2
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
         else:
@@ -648,7 +686,7 @@ class Hero(pygame.sprite.Sprite):
             else:
                 self.image = Hero.image_st
                 self.animated = False
-            self.rect.y -= cell_size // 2 * self.direct
+            self.rect.y -= board.cell_size // 2 * self.direct
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
 
@@ -739,7 +777,7 @@ class Skeleton(pygame.sprite.Sprite):
                 self.image = self.image_st
                 self.animated = False
                 board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'S'
-            self.rect.x += self.direct * cell_size // 2
+            self.rect.x += self.direct * board.cell_size // 2
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
         else:
@@ -751,12 +789,14 @@ class Skeleton(pygame.sprite.Sprite):
                 self.image = self.image_st
                 self.animated = False
                 board.cur_lvl_map[9 - self.pos[1]][self.pos[0]] = 'S'
-            self.rect.y -= cell_size // 2 * self.direct
+            self.rect.y -= board.cell_size // 2 * self.direct
             if self.direct == -1:
                 self.image = pygame.transform.flip(self.image, True, False)
 
     def die(self):
-        self.kill()
+        if self.alive():
+            pygame.mixer.Sound('data/kill.wav').play()
+            self.kill()
 
 
 class Wall(pygame.sprite.Sprite):
@@ -850,7 +890,8 @@ class Fireball(pygame.sprite.Sprite):
         board.fireballs.append(self)
 
     def update(self):
-        if self.pos[1] + self.direct not in range(board.width):
+        if self.pos[1] + self.direct not in range(board.width) or \
+                board.cur_lvl_map[self.pos[0]][self.pos[1] + self.direct] == 'W':
             self.direct *= -1
             self.image = pygame.transform.flip(self.image, True, False)
         self.pos = self.pos[0], self.pos[1] + self.direct
