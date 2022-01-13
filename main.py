@@ -3,6 +3,9 @@ import sys
 import os
 import time
 import random
+import sqlite3
+from PyQt5.QtWidgets import QApplication, QWidget, QInputDialog, QMessageBox, QFileDialog
+from profiles import Ui_Form as Profiles_Ui
 
 BGCOLOR = (120, 40, 30)
 NETCOLOR = (40, 10, 5)
@@ -78,30 +81,53 @@ def main_menu():
     title_text = "Ковбой против скелетов"
     level_texts = ["1 УРОВЕНЬ", "2 УРОВЕНЬ", "3 УРОВЕНЬ"]
     font = pygame.font.Font(None, 65)
+    profile_pic = load_image(board.profile_pict_link)
+    profile_pic_size = (260, 260)
+    profile_pic_pos = user_screen[0] // 2 - profile_pic_size[0] // 2, user_screen[1] // 2 - 100
 
-    level1_btn_size = level2_btn_size = level3_btn_size = (320, 110)
+    button_size = (310, 100)
 
-    level1_btn_pos = ((user_screen[0] - level1_btn_size[0]) // 2, 380)
+    level1_btn_pos = (user_screen[0] // 2 + 200, 380)
     level1_button_rendered = font.render(level_texts[0], True, pygame.Color('black'))
 
-    level2_btn_pos = ((user_screen[0] - level2_btn_size[0]) // 2, 540)
+    level2_btn_pos = (user_screen[0] // 2 + 200, 540)
     level2_button_rendered = font.render(level_texts[1], True, pygame.Color('black'))
 
-    level3_btn_pos = ((user_screen[0] - level3_btn_size[0]) // 2, 700)
+    level3_btn_pos = (user_screen[0] // 2 + 200, 700)
     level3_button_rendered = font.render(level_texts[2], True, pygame.Color('black'))
+
+    profile_btn_pos = (user_screen[0] // 2 - 200 - button_size[0], 700)
+    profile_btn_rendered = pygame.font.Font(None, 45).render('Выбрать профиль', True, pygame.Color('black'))
+
+    pic_btn_pos = (user_screen[0] // 2 - 200 - button_size[0], 540)
+    pic_btn_rendered = pygame.font.Font(None, 38).render('Сменить изображение', True, pygame.Color('black'))
+
+    profile_name_rendered = pygame.font.Font(None, 38).render(board.cur_profile_name, True, pygame.Color('white'))
+    profile_name_pos = (user_screen[0] - profile_name_rendered.get_rect()[2]) // 2, profile_pic_pos[1] + \
+                       profile_pic_size[1] + 30
 
     fon = pygame.transform.scale(load_image('bg 4 menu.jpg'), user_screen)
     screen.blit(fon, (0, 0))
-    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level1_btn_pos, level1_btn_size))
-    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
-    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level2_btn_pos, level2_btn_size))
-    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level2_btn_pos, level2_btn_size), 8)
-    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level3_btn_pos, level3_btn_size))
-    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level3_btn_pos, level3_btn_size), 8)
+    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level1_btn_pos, button_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, button_size), 8)
+    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level2_btn_pos, button_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level2_btn_pos, button_size), 8)
+    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(level3_btn_pos, button_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level3_btn_pos, button_size), 8)
+    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(profile_btn_pos, button_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(profile_btn_pos, button_size), 8)
+    pygame.draw.rect(screen, (200, 30, 20), pygame.Rect(pic_btn_pos, button_size))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(pic_btn_pos, button_size), 8)
+
+    pygame.draw.rect(screen, (140, 40, 30), pygame.Rect((profile_pic_pos[0] - 20, profile_pic_pos[1] - 20),
+                                                        (profile_pic_size[0] + 40, profile_pic_size[1] + 110)))
+    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect((profile_pic_pos[0] - 20, profile_pic_pos[1] - 20),
+                                                     (profile_pic_size[0] + 40, profile_pic_size[1] + 110)), 8)
 
     title_rendered = font.render(title_text, True, pygame.Color('white'))
     title_rect = (user_screen[0] - title_rendered.get_rect()[2]) / 2, user_screen[0] // 8
     screen.blit(title_rendered, title_rect)
+    screen.blit(profile_name_rendered, profile_name_pos)
 
     pygame.mixer.music.load('data/menu music.mp3')
     pygame.mixer.music.set_volume(0.5)
@@ -112,48 +138,82 @@ def main_menu():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    terminate()
-            elif pygame.mouse.get_pos()[0] in range(level1_btn_pos[0], level1_btn_pos[0] + level1_btn_size[0]) and \
-                    pygame.mouse.get_pos()[1] in range(level1_btn_pos[1], level1_btn_pos[1] + level1_btn_size[1]):
-                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level1_btn_pos, level1_btn_size))
-                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
+            if profiles_form.isHidden():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        terminate()
+                elif pygame.mouse.get_pos()[0] in range(level1_btn_pos[0], level1_btn_pos[0] + button_size[0]) and \
+                        pygame.mouse.get_pos()[1] in range(level1_btn_pos[1], level1_btn_pos[1] + button_size[1]):
+                    pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level1_btn_pos, button_size))
+                    pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level1_btn_pos, button_size), 8)
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        click_sound.play()
+                        board.cur_lvl_num = 1
+                        return 'data/level 1.txt'
+                else:
+                    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level1_btn_pos, button_size))
+                    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, button_size), 8)
                 screen.blit(level1_button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    click_sound.play()
-                    board.cur_lvl_num = 1
-                    return 'data/level 1.txt'
-            else:
-                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level1_btn_pos, level1_btn_size))
-                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level1_btn_pos, level1_btn_size), 8)
-                screen.blit(level1_button_rendered, (level1_btn_pos[0] + 30, level1_btn_pos[1] + 30))
-            if pygame.mouse.get_pos()[0] in range(level2_btn_pos[0], level2_btn_pos[0] + level2_btn_size[0]) and \
-                    pygame.mouse.get_pos()[1] in range(level2_btn_pos[1], level2_btn_pos[1] + level2_btn_size[1]):
-                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level2_btn_pos, level2_btn_size))
-                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level2_btn_pos, level2_btn_size), 8)
+                if pygame.mouse.get_pos()[0] in range(level2_btn_pos[0], level2_btn_pos[0] + button_size[0]) and \
+                        pygame.mouse.get_pos()[1] in range(level2_btn_pos[1], level2_btn_pos[1] + button_size[1]):
+                    pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level2_btn_pos, button_size))
+                    pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level2_btn_pos, button_size), 8)
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        click_sound.play()
+                        board.cur_lvl_num = 2
+                        return 'data/level 2.txt'
+                else:
+                    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level2_btn_pos, button_size))
+                    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level2_btn_pos, button_size), 8)
                 screen.blit(level2_button_rendered, (level2_btn_pos[0] + 30, level2_btn_pos[1] + 30))
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    click_sound.play()
-                    board.cur_lvl_num = 2
-                    return 'data/level 2.txt'
-            else:
-                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level2_btn_pos, level2_btn_size))
-                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level2_btn_pos, level2_btn_size), 8)
-                screen.blit(level2_button_rendered, (level2_btn_pos[0] + 30, level2_btn_pos[1] + 30))
-            if pygame.mouse.get_pos()[0] in range(level3_btn_pos[0], level3_btn_pos[0] + level3_btn_size[0]) and \
-                    pygame.mouse.get_pos()[1] in range(level3_btn_pos[1], level3_btn_pos[1] + level3_btn_size[1]):
-                pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level3_btn_pos, level3_btn_size))
-                pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level3_btn_pos, level3_btn_size), 8)
+                if pygame.mouse.get_pos()[0] in range(level3_btn_pos[0], level3_btn_pos[0] + button_size[0]) and \
+                        pygame.mouse.get_pos()[1] in range(level3_btn_pos[1], level3_btn_pos[1] + button_size[1]):
+                    pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(level3_btn_pos, button_size))
+                    pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(level3_btn_pos, button_size), 8)
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        click_sound.play()
+                        board.cur_lvl_num = 3
+                        return 'data/level 3.txt'
+                else:
+                    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level3_btn_pos, button_size))
+                    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level3_btn_pos, button_size), 8)
                 screen.blit(level3_button_rendered, (level3_btn_pos[0] + 30, level3_btn_pos[1] + 30))
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    click_sound.play()
-                    board.cur_lvl_num = 3
-                    return 'data/level 3.txt'
-            else:
-                pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(level3_btn_pos, level3_btn_size))
-                pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(level3_btn_pos, level3_btn_size), 8)
-                screen.blit(level3_button_rendered, (level3_btn_pos[0] + 30, level3_btn_pos[1] + 30))
+                if pygame.mouse.get_pos()[0] in range(profile_btn_pos[0], profile_btn_pos[0] + button_size[0]) and \
+                        pygame.mouse.get_pos()[1] in range(profile_btn_pos[1], profile_btn_pos[1] + button_size[1]):
+                    pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(profile_btn_pos, button_size))
+                    pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(profile_btn_pos, button_size), 8)
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if profiles_form.isHidden():
+                            click_sound.play()
+                            profiles_form.show()
+                else:
+                    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(profile_btn_pos, button_size))
+                    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(profile_btn_pos, button_size), 8)
+                screen.blit(profile_btn_rendered, (profile_btn_pos[0] + 12, profile_btn_pos[1] + 35))
+                if pygame.mouse.get_pos()[0] in range(pic_btn_pos[0], pic_btn_pos[0] + button_size[0]) and \
+                        pygame.mouse.get_pos()[1] in range(pic_btn_pos[1], pic_btn_pos[1] + button_size[1]):
+                    pygame.draw.rect(screen, (180, 30, 20), pygame.Rect(pic_btn_pos, button_size))
+                    pygame.draw.rect(screen, (15, 0, 0), pygame.Rect(pic_btn_pos, button_size), 8)
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if board.cur_profile_name != 'Без профиля':
+                            profiles_form.change_picture()
+                        else:
+                            pygame.mixer.Sound('data/fail.wav').play()
+                else:
+                    pygame.draw.rect(screen, (160, 20, 10), pygame.Rect(pic_btn_pos, button_size))
+                    pygame.draw.rect(screen, (20, 0, 0), pygame.Rect(pic_btn_pos, button_size), 8)
+                screen.blit(pic_btn_rendered, (pic_btn_pos[0] + 10, pic_btn_pos[1] + 36))
+        profile_name_rendered = pygame.font.Font(None, 38).render(board.cur_profile_name, True, pygame.Color('white'))
+        profile_name_pos = (user_screen[0] - profile_name_rendered.get_rect()[2]) // 2, profile_pic_pos[1] + \
+                           profile_pic_size[1] + 30
+        pygame.draw.rect(screen, (140, 40, 30), pygame.Rect((profile_pic_pos[0] - 20, profile_pic_pos[1] - 20),
+                                                            (profile_pic_size[0] + 40, profile_pic_size[1] + 110)))
+        pygame.draw.rect(screen, (20, 0, 0), pygame.Rect((profile_pic_pos[0] - 20, profile_pic_pos[1] - 20),
+                                                         (profile_pic_size[0] + 40, profile_pic_size[1] + 110)), 8)
+        profile_pic = load_image(board.profile_pict_link)
+        profile_pic = pygame.transform.scale(profile_pic, profile_pic_size)
+        screen.blit(profile_pic, profile_pic_pos)
+        screen.blit(profile_name_rendered, profile_name_pos)
         pygame.display.flip()
 
 
@@ -297,24 +357,25 @@ def start_level():
             for fb in board.fireballs:
                 if not fb.moved:
                     fb.move()
-        if hero.death():
-            pygame.mixer.music.stop()
-            fail_sound.play()
+        if not hero.cheat:
+            if hero.death():
+                pygame.mixer.music.stop()
+                fail_sound.play()
 
-            hero.image = load_image('grave.png')
-            hero.image = pygame.transform.scale(hero.image, (110, 110))
-            board.render(screen)
-            tiles.draw(screen)
-            traps.draw(screen)
-            characters.draw(screen)
-            if not hero.has_blade and hero.blade:
-                screen.blit(hero.blade.image, hero.blade.rect)
-            if board.key_ex and not hero.has_key:
-                screen.blit(key.image, key.rect)
-            pygame.display.flip()
+                hero.image = load_image('grave.png')
+                hero.image = pygame.transform.scale(hero.image, (110, 110))
+                board.render(screen)
+                tiles.draw(screen)
+                traps.draw(screen)
+                characters.draw(screen)
+                if not hero.has_blade and hero.blade:
+                    screen.blit(hero.blade.image, hero.blade.rect)
+                if board.key_ex and not hero.has_key:
+                    screen.blit(key.image, key.rect)
+                pygame.display.flip()
 
-            time.sleep(1)
-            end_screen('loss')
+                time.sleep(1)
+                end_screen('loss')
         screen.blit(screen_image, (0, 0))
         board.render(screen)
         tiles.draw(screen)
@@ -458,10 +519,29 @@ def end_screen(state):
     return_text = 'Главное меню'
     return_btn_pos = (1060, 640)
     return_btn_size = (340, 150)
+    font = pygame.font.Font(None, 60)
 
+    if board.cur_profile_name != 'Без профиля':
+        if int(profiles_form.cur.execute(
+                f"select \"hs{board.cur_lvl_num}\"  from profiles_table where \"name\" = \"{board.cur_profile_name}\"").fetchone()[
+                   0]) > board.moves_counter \
+                or int(profiles_form.cur.execute(
+            f"select \"hs{board.cur_lvl_num}\"  from profiles_table where \"name\" = \"{board.cur_profile_name}\"").fetchone()[
+                           0]) == 0:
+            profiles_form.cur.execute(
+                f"UPDATE profiles_table SET \"hs{board.cur_lvl_num}\" = {board.moves_counter} WHERE name = "
+                f"\"{board.cur_profile_name}\"")
+            profiles_form.con.commit()
+
+            hs_rendered = font.render(f'Новый рекорд!', True, pygame.Color('black'))
+        else:
+            hs = str(profiles_form.cur.execute(
+                f"SELECT \"hs{str(board.cur_lvl_num)}\" FROM profiles_table WHERE name = \"{board.cur_profile_name}\"").fetchone()[
+                         0])
+            hs_rendered = font.render(f'Ваш рекорд: {hs}', True, pygame.Color('black'))
+            pass
     fon = pygame.transform.scale(load_image('bg 4 game1.jpg'), user_screen)
     screen.blit(fon, (0, 0))
-    font = pygame.font.Font(None, 60)
     adv_font = pygame.font.Font(None, 52)
     click_sound = pygame.mixer.Sound('data/click.wav')
     click_sound.set_volume(0.6)
@@ -501,6 +581,11 @@ def end_screen(state):
         counter_res_rendered = font.render(counter_res, True, pygame.Color('black'))
         counter_res_rect = (user_screen[0] - counter_res_rendered.get_rect()[2]) // 2, text_top_rect[1] + 110
         screen.blit(counter_res_rendered, counter_res_rect)
+        if board.cur_profile_name != 'Без профиля':
+            hs_rect = (user_screen[0] - hs_rendered.get_rect()[2]) // 2, text_top_rect[1] + 170
+            screen.blit(hs_rendered, hs_rect)
+        else:
+            print(board.cur_profile_name)
     fail_sound = pygame.mixer.Sound('data/fail.wav')
     fail_sound.set_volume(0.7)
     fail_sound.play()
@@ -568,6 +653,8 @@ class Board:
         self.exit_door = None
         self.key_ex = False
         self.cur_lvl_beat = 0.0
+        self.cur_profile_name = profiles_form.current_profile_name
+        self.profile_pict_link = profiles_form.cur_profile_pict
 
     # настройка внешнего вида
     def set_view(self, left, top, cells_size):
@@ -640,6 +727,7 @@ class Hero(pygame.sprite.Sprite):
         self.blade = None
         self.has_blade = False
         self.last_anim = ''
+        self.cheat = False
 
     def move(self, ax, step):
         self.moved = time.monotonic()
@@ -903,5 +991,253 @@ class Fireball(pygame.sprite.Sprite):
         self.moved = True
 
 
+class ProfilesForm(QWidget, Profiles_Ui):
+    def __init__(self):
+        """
+        Инициализация интерфейса формы ProfilesForm,
+        преназначенной для работы с профилями игроков
+        """
+
+        # Загрузка интерфейса
+        super().__init__()
+        self.setupUi(self)
+
+        # Подключение к базе данных profiles_list
+        self.con = sqlite3.connect("data/profiles.db")
+        self.cur = self.con.cursor()
+
+        # Подключение соответствующих функций к кнопкам
+        self.choose_button.clicked.connect(self.choose_profile)
+        self.create_button.clicked.connect(self.create_profile)
+        self.delete_button.clicked.connect(self.delete_profile)
+        self.rename_button.clicked.connect(self.rename)
+        self.current_profile_name = 'Без профиля'
+        self.cur_profile_pict = 'default_pic.png'
+
+        # Вызов метода show_profiles для отображения списка существующих профилей
+        # в объекте profiles_table
+        self.show_profiles()
+
+    def show_profiles(self):
+        """
+        Функция отображает в profiles_table все существующие профили пользователей
+        """
+
+        # Получение имен пользователей из базы данных и занесение их в список names
+        self.profiles_table.clear()
+        names = self.cur.execute("SELECT name FROM profiles_table").fetchall()
+
+        # Добавление в profiles_table каждого элемента из списка names
+        for elem in names:
+            self.profiles_table.addItem(elem[0])
+
+    def create_profile(self):
+        """
+        Функция для создания нового профиля пользователя
+        """
+
+        # Пользователь вводит имя нового профиля в диалоговом окне QInputDialog
+        name, ok_pressed = QInputDialog.getText(self, "Создание профиля",
+                                                "Введите имя профиля:")
+
+        # Если пользователь нажал OK и не оставил строку с именем нового профиля пустой,
+        # программа добавляет новую строку с этим именем в базу данных,
+        # если имя нового профиля уникально и его длина не превышает 24 символа
+        if ok_pressed and name:
+
+            if len(name) < 25:
+
+                if self.if_unique(name):
+
+                    if name != 'Без профиля':
+
+                        self.cur.execute("INSERT INTO profiles_table(name) VALUES(\'" + str(name) + "\')")
+                        self.con.commit()
+
+                        # Добавление в profiles_table нового профиля
+                        self.profiles_table.addItem(name)
+
+                    else:
+                        QMessageBox.critical(self, "Ошибка", "Введите другое имя")
+                        self.create_profile()
+
+                else:
+                    QMessageBox.critical(self, "Ошибка", "Имя нового профиля должно быть уникальным")
+                    self.create_profile()
+
+            else:
+                QMessageBox.critical(self, "Ошибка", "Длина имени нового профиля не должна превышать 24 символа")
+                self.create_profile()
+
+        # Если пользователь оставил строку с именем нового профиля пустой, программа сообщает ему об ошибке
+        # и предлагает ввести имя нового профиля снова
+        elif ok_pressed and not name:
+            QMessageBox.critical(self, "Ошибка", "Имя профиля не может быть пустым",
+                                 QMessageBox.Ok)
+            self.create_profile()
+
+    def choose_profile(self):
+        """
+        Функция для выбора профиля пользователя из уже существующих
+        """
+
+        if self.profiles_table.currentItem():
+
+            # Если выбранный пользователем профиль уже активен, программа сообщает ему об этом
+            if self.profiles_table.selectedItems()[0].text() == board.cur_profile_name:
+                QMessageBox.critical(self, "Ошибка",
+                                     f"Профиль {self.profiles_table.selectedItems()[0].text()}"
+                                     f" уже активен в данный момент", QMessageBox.Ok)
+
+            else:
+                self.current_profile_name = self.profiles_table.selectedItems()[0].text()
+                board.cur_profile_name = self.current_profile_name
+
+                pict_link = self.cur.execute(
+                    f"SELECT image FROM profiles_table WHERE "
+                    f"name = \"{self.current_profile_name}\"").fetchone()[0]
+
+                # Программа устанавливает в pixmap изображение профиля пользователя, если он поставил его ранее.
+                if pict_link:
+                    board.profile_pict_link = pict_link
+                    self.cur_profile_pict = pict_link
+
+                # Если пользователь не установил для своего профиля никакое изображение,
+                # программа устанавливает изображение по умолчанию - default_pic.png
+                else:
+                    board.profile_pict_link = 'default_pic.png'
+                    self.cur_profile_pict = 'default_pic.png'
+
+                # Закрытие формы выбора профиля
+                self.close()
+
+        # Если пользователь не выбрал профиль, программа сообщает ему об ошибке
+        else:
+            QMessageBox.critical(self, "Ошибка", "Выберите профиль, под которым хотите войти",
+                                 QMessageBox.Ok)
+
+    def delete_profile(self):
+        """
+        Функция для удаления одного из существующих профилей пользователя
+        """
+
+        # Код выполняется если пользователь выбрал профиль в profiles_table
+        if self.profiles_table.currentItem():
+            name = self.profiles_table.currentItem().text()
+
+            # Программа проверяет, является ли выбранный профиль активным в данный момент,
+            # если это так, сообщает пользователю об этом, иначе - удаляет выбранный профиль
+            if name != board.cur_profile_name:
+
+                # Программа спрашивает у пользователя, действительно ли он хочет хочет удалить выбранный профиль
+                qm = QMessageBox
+                reply = qm.question(self, 'Удаление профиля', f"Вы уверены, что хотите удалить профиль \"{name}\"?",
+                                    qm.Yes | qm.No)
+
+                # Если пользователь подтвердил свой выбор,
+                # из базы данных удаляется строка с именем соответствующего профиля
+                if reply == qm.Yes:
+                    self.cur.execute("DELETE FROM profiles_table WHERE name = ?", (name,))
+
+                    # Обновление списка профилей profiles_table с помощью метода show_profiles
+                    self.con.commit()
+                    self.show_profiles()
+
+            else:
+                QMessageBox.critical(self, "Ошибка", "Нельзя удалить профиль, выбранный в данный момент",
+                                     QMessageBox.Ok)
+
+        # Если пользователь не выбрал профиль, который хочет удалить, программа сообщает ему об этом
+        else:
+            QMessageBox.critical(self, "Ошибка", "Выберите профиль, который хотите удалить",
+                                 QMessageBox.Ok)
+
+    def if_unique(self, profile_name):
+        """
+        Функция проверяет, является ли переданное имя профиля уникальным
+        :param profile_name: проверяемое имя профиля
+        :return: True или False
+        """
+
+        if self.cur.execute(f"SELECT name FROM profiles_table WHERE name = "
+                            f" \"{profile_name}\"").fetchone() is None:
+            return True
+        return False
+
+    def change_picture(self):
+        """
+        Функция для изменения изображения текущего профиля
+        """
+
+        # Открытие диалогового окна для выбора пользователем изображения
+        pict = QFileDialog.getOpenFileName(
+            self, 'Выберите изображение', '',
+            'Изображение (*.jpg);;''Изображение (*.jpg);;Все файлы (*)')[0]
+
+        # Следующие действия произодятся, если пользователь выбрал изображение
+        if pict:
+            # Занесение ссылки на изображение в базу данных
+            self.cur.execute(f"UPDATE profiles_table SET image = \"{pict}\" WHERE name = \"{board.cur_profile_name}\"")
+            self.con.commit()
+
+            board.profile_pict_link = pict
+
+    def rename(self):
+        """
+        Функция меняет имя выбранного профиля на новое, введённое пользователем в диалоговом окне
+        """
+
+        if self.profiles_table.currentItem():
+
+            # Получение у пользователя имени, на которое он хочет переименовать выбранный профиль,
+            # с помощью диалогового окна
+            new_name, ok_pressed = QInputDialog.getText(self, "Переименование профиля",
+                                                        "Введите новое имя профиля:")
+            if ok_pressed:
+                if new_name:
+
+                    # Проверка, не занято ли введённое имя другим профилем
+                    if not self.cur.execute(f"SELECT name FROM profiles_table WHERE name = \"{new_name}\"").fetchone():
+
+                        if new_name != 'Без профиля':
+                            # Замена старого имени профиля на новое в таблицах profiles
+                            self.cur.execute(f"UPDATE profiles_table SET name = \"{new_name}\" WHERE name = "
+                                             f"\"{self.profiles_table.selectedItems()[0].text()}\"")
+
+                            # Если пользователь переименовал профиль, выбранный в данный момент,
+                            # программа меняет текст в лейбле profile_name_label на новое имя профиля
+                            if board.cur_profile_name == self.profiles_table.selectedItems()[0].text():
+                                board.cur_profile_name = new_name
+
+                            # Сохранение изменений в базе данных и обновление списка профилей в profiles_table
+                            self.con.commit()
+                            self.show_profiles()
+
+                        else:
+                            QMessageBox.critical(self, "Ошибка", f"Введите другое имя",
+                                                 QMessageBox.Ok)
+
+                    # Если введённое пользователем имя уже занято другим профилем, программа сообщает об ошибке
+                    # и предлагает ввести имя еще раз
+                    else:
+                        QMessageBox.critical(self, "Ошибка", f"Профиль с именем \"{new_name}\" уже существует",
+                                             QMessageBox.Ok)
+                        self.rename()
+
+                # Если пользователь не ввел новое имя профиля, программа сообщает об ошибке
+                # и предлагает ввести имя еще раз
+                else:
+                    QMessageBox.critical(self, "Ошибка", "Имя профиля не может быть пустым",
+                                         QMessageBox.Ok)
+                    self.rename()
+
+        # Если пользователь не выбрал профиль, который он хочет переименовать, программа сообщает об ошибке
+        else:
+            QMessageBox.critical(self, "Ошибка", "Выберите профиль, который хотите переименовать",
+                                 QMessageBox.Ok)
+
+
 # Начало
+app = QApplication(sys.argv)
+profiles_form = ProfilesForm()
 beginning()
