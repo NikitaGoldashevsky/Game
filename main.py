@@ -520,6 +520,7 @@ def end_screen(state):
     return_btn_pos = (1060, 640)
     return_btn_size = (340, 150)
     font = pygame.font.Font(None, 60)
+    hs_rendered = ''
 
     if board.cur_profile_name != 'Без профиля':
         if int(profiles_form.cur.execute(
@@ -1029,7 +1030,7 @@ class ProfilesForm(QWidget, Profiles_Ui):
 
         # Добавление в profiles_table каждого элемента из списка names
         for elem in names:
-            self.profiles_table.addItem(elem[0])
+            self.profiles_table.addItem(str(elem[0]))
 
     def create_profile(self):
         """

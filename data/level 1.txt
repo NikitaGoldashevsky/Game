@@ -1,6 +1,6 @@
 10 0.5868
 WWWWWWWWWW
-W-K--WS-PW
+W-K--WS--W
 WS---W-WEW
 WTTWWW-WWW
 WF-------W
@@ -8,7 +8,7 @@ W---F----W
 W---WWDWWW
 W---W--S-W
 W---W--B-W
-W--WWWWWWW
+WP-WWWWWWW
 uddu
 drrudllu
 rrlllr
